@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useTranslation, type Locale } from '@/lib/use-translation'
 import { useAppGoBack } from '@/hooks/useAppGoBack'
 import { useAppContext } from '@/lib/app-context'
+import { ChangePasswordModal } from '@/components/ChangePasswordModal'
 import { getElevenLabsSupportedLanguages, getLanguageDisplayName, type Language } from '@/lib/languages'
 import { getFontScaleOptions, useFontScale, type FontScale } from '@/hooks/useFontScale'
 import { getTerminalFontSizeOptions, useTerminalFontSize, type TerminalFontSize } from '@/hooks/useTerminalFontSize'
@@ -620,6 +621,9 @@ export default function SettingsPage() {
                         </button>
                     </div>
 
+                    {/* Password section (mokaclaude only; guarded by feature flag) */}
+                    <PasswordSection />
+
                     {/* Sign Out section */}
                     {signOut && (
                         <div className="border-b border-[var(--app-divider)]">
@@ -642,5 +646,53 @@ export default function SettingsPage() {
                 </div>
             </div>
         </div>
+    )
+}
+
+function readLSStrict(key: string): string | null {
+    try { return localStorage.getItem(key) } catch { return null }
+}
+
+function PasswordSection() {
+    const { t } = useTranslation()
+    const { baseUrl } = useAppContext()
+    const [show, setShow] = useState(false)
+    const [msg, setMsg] = useState<string | null>(null)
+    const tokenKey = `hapi_access_token::${baseUrl}`
+    const passKey = `hapi_access_password::${baseUrl}`
+    const accessToken = readLSStrict(tokenKey)
+    const currentPassword = readLSStrict(passKey) ?? ''
+
+    if (!accessToken) return null
+
+    return (
+        <>
+            <div className="border-b border-[var(--app-divider)]">
+                <div className="px-3 py-2 text-xs font-semibold text-[var(--app-hint)] uppercase tracking-wide">
+                    {t('settings.password.title')}
+                </div>
+                <button
+                    type="button"
+                    onClick={() => setShow(true)}
+                    className="flex w-full items-center px-3 py-3 text-left text-[var(--app-fg)] transition-colors hover:bg-[var(--app-subtle-bg)]"
+                >
+                    {t('settings.password.change')}
+                </button>
+                {msg && <div className="px-3 pb-2 text-xs text-emerald-600">{msg}</div>}
+            </div>
+            {show && (
+                <ChangePasswordModal
+                    baseUrl={baseUrl}
+                    accessToken={accessToken}
+                    currentPassword={currentPassword}
+                    onCancel={() => setShow(false)}
+                    onSuccess={(_newToken, newPassword) => {
+                        try { localStorage.setItem(passKey, newPassword) } catch {}
+                        setShow(false)
+                        setMsg(t('settings.password.success'))
+                    }}
+                />
+            )}
+        </>
     )
 }

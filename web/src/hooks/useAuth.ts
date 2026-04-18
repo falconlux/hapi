@@ -4,7 +4,7 @@ import type { AuthResponse } from '@/types/api'
 
 export type AuthSource =
     | { type: 'telegram'; initData: string }
-    | { type: 'accessToken'; token: string }
+    | { type: 'accessToken'; token: string; password?: string }
 
 function decodeJwtExpMs(token: string): number | null {
     const parts = token.split('.')
@@ -26,11 +26,13 @@ function decodeJwtExpMs(token: string): number | null {
     }
 }
 
-function getAuthPayload(source: AuthSource): { initData: string } | { accessToken: string } {
+function getAuthPayload(source: AuthSource): { initData: string } | { accessToken: string; password?: string } {
     if (source.type === 'telegram') {
         return { initData: source.initData }
     }
-    return { accessToken: source.token }
+    return source.password
+        ? { accessToken: source.token, password: source.password }
+        : { accessToken: source.token }
 }
 
 function isNotBoundError(error: unknown): boolean {
@@ -44,6 +46,8 @@ export function useAuth(authSource: AuthSource | null, baseUrl: string): {
     isLoading: boolean
     error: string | null
     needsBinding: boolean
+    mustChangePassword: boolean
+    overrideToken: (newToken: string) => void
     bind: (accessToken: string) => Promise<void>
 } {
     const [token, setToken] = useState<string | null>(null)
@@ -51,6 +55,7 @@ export function useAuth(authSource: AuthSource | null, baseUrl: string): {
     const [isLoading, setIsLoading] = useState<boolean>(false)
     const [error, setError] = useState<string | null>(null)
     const [needsBinding, setNeedsBinding] = useState<boolean>(false)
+    const [mustChangePassword, setMustChangePassword] = useState<boolean>(false)
     const refreshPromiseRef = useRef<Promise<string | null> | null>(null)
     const tokenRef = useRef<string | null>(null)
     const lastRefreshAttemptRef = useRef<number>(0)
@@ -97,6 +102,7 @@ export function useAuth(authSource: AuthSource | null, baseUrl: string): {
                 setUser(auth.user)
                 setError(null)
                 setNeedsBinding(false)
+                setMustChangePassword(!!auth.mustChangePassword)
                 return auth.token
             } catch (error) {
                 if (currentSource.type === 'telegram' && isNotBoundError(error)) {
@@ -187,6 +193,7 @@ export function useAuth(authSource: AuthSource | null, baseUrl: string): {
                 setToken(auth.token)
                 setUser(auth.user)
                 setNeedsBinding(false)
+                setMustChangePassword(!!auth.mustChangePassword)
             } catch (e) {
                 if (isCancelled) return
                 if (authSource.type === 'telegram' && isNotBoundError(e)) {
@@ -285,5 +292,11 @@ export function useAuth(authSource: AuthSource | null, baseUrl: string): {
         }
     }, [authSource, refreshAuth])
 
-    return { token, user, api, isLoading, error, needsBinding, bind }
+    const overrideToken = useCallback((newToken: string) => {
+        tokenRef.current = newToken
+        setToken(newToken)
+        setMustChangePassword(false)
+    }, [])
+
+    return { token, user, api, isLoading, error, needsBinding, mustChangePassword, overrideToken, bind }
 }

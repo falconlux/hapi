@@ -72,12 +72,18 @@ export type Machine = {
 
 export type AuthResponse = {
     token: string
+    mustChangePassword?: boolean
     user: {
         id: number
         username?: string
         firstName?: string
         lastName?: string
     }
+}
+
+export type ChangePasswordResponse = {
+    success: true
+    token: string
 }
 
 export type SessionsResponse = { sessions: SessionSummary[] }

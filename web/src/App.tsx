@@ -19,6 +19,7 @@ import { useTranslation } from '@/lib/use-translation'
 // import { VoiceProvider } from '@/lib/voice-context' // voice disabled
 import { requireHubUrlForLogin } from '@/lib/runtime-config'
 import { LoginPrompt } from '@/components/LoginPrompt'
+import { ChangePasswordModal } from '@/components/ChangePasswordModal'
 import { InstallPrompt } from '@/components/InstallPrompt'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { SyncingBanner } from '@/components/SyncingBanner'
@@ -44,8 +45,8 @@ export function App() {
 function AppInner() {
     const { t } = useTranslation()
     const { serverUrl, baseUrl, setServerUrl, clearServerUrl } = useServerUrl()
-    const { authSource, isLoading: isAuthSourceLoading, setAccessToken, clearAuth } = useAuthSource(baseUrl)
-    const { token, api, isLoading: isAuthLoading, error: authError, needsBinding, bind } = useAuth(authSource, baseUrl)
+    const { authSource, isLoading: isAuthSourceLoading, setAccessToken, updatePassword, clearAuth } = useAuthSource(baseUrl)
+    const { token, api, isLoading: isAuthLoading, error: authError, needsBinding, mustChangePassword, overrideToken, bind } = useAuth(authSource, baseUrl)
     const goBack = useAppGoBack()
     const pathname = useLocation({ select: (location) => location.pathname })
     const matchRoute = useMatchRoute()
@@ -355,6 +356,22 @@ function AppInner() {
                     Open this page from Telegram using the bot's "Open App" button (not "Open in browser").
                 </div>
             </div>
+        )
+    }
+
+    // Force change password modal (blocks main UI until password is changed)
+    if (mustChangePassword && authSource.type === 'accessToken') {
+        return (
+            <ChangePasswordModal
+                baseUrl={baseUrl}
+                accessToken={authSource.token}
+                currentPassword={authSource.password ?? ''}
+                force
+                onSuccess={(newToken, newPassword) => {
+                    updatePassword(newPassword)
+                    overrideToken(newToken)
+                }}
+            />
         )
     }
 

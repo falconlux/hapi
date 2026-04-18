@@ -6,6 +6,12 @@ import { constantTimeEquals } from '../../utils/crypto'
 import { parseAccessToken } from '../../utils/accessToken'
 import { validateTelegramInitData } from '../telegramInitData'
 import { getOrCreateOwnerId } from '../../config/ownerId'
+import {
+    getEntry as getPasswordEntry,
+    ensureDefault as ensureDefaultPassword,
+    verify as verifyPassword,
+    changePassword
+} from '../../config/passwordStore'
 import type { WebAppEnv } from '../middleware/auth'
 import type { Store } from '../../store'
 
@@ -14,10 +20,17 @@ const telegramAuthSchema = z.object({
 })
 
 const accessTokenAuthSchema = z.object({
-    accessToken: z.string()
+    accessToken: z.string(),
+    password: z.string().optional()
 })
 
 const authBodySchema = z.union([telegramAuthSchema, accessTokenAuthSchema])
+
+const changePasswordSchema = z.object({
+    accessToken: z.string(),
+    currentPassword: z.string(),
+    newPassword: z.string().min(6)
+})
 
 export function createAuthRoutes(jwtSecret: Uint8Array, store: Store): Hono<WebAppEnv> {
     const app = new Hono<WebAppEnv>()
@@ -34,6 +47,7 @@ export function createAuthRoutes(jwtSecret: Uint8Array, store: Store): Hono<WebA
         let firstName: string | undefined
         let lastName: string | undefined
         let namespace: string
+        let mustChange = false
 
         // Access Token authentication (CLI_API_TOKEN)
         if ('accessToken' in parsed.data) {
@@ -41,9 +55,27 @@ export function createAuthRoutes(jwtSecret: Uint8Array, store: Store): Hono<WebA
             if (!parsedToken || !constantTimeEquals(parsedToken.baseToken, configuration.cliApiToken)) {
                 return c.json({ error: 'Invalid access token' }, 401)
             }
+            namespace = parsedToken.namespace
+
+            // Password gate: auto-seed default (mustChange=true) then require.
+            let entry = await getPasswordEntry(namespace)
+            if (!entry) {
+                await ensureDefaultPassword(namespace)
+                entry = await getPasswordEntry(namespace)
+            }
+            if (entry) {
+                if (!parsed.data.password) {
+                    return c.json({ error: 'Password required', passwordRequired: true }, 401)
+                }
+                const result = await verifyPassword(namespace, parsed.data.password)
+                if (!result.valid) {
+                    return c.json({ error: 'Invalid password', passwordRequired: true }, 401)
+                }
+                mustChange = result.mustChange
+            }
+
             userId = await getOrCreateOwnerId()
             firstName = 'Web User'
-            namespace = parsedToken.namespace
         } else {
             if (!configuration.telegramEnabled || !configuration.telegramBotToken) {
                 return c.json({ error: 'Telegram authentication is disabled. Configure TELEGRAM_BOT_TOKEN.' }, 503)
@@ -68,7 +100,7 @@ export function createAuthRoutes(jwtSecret: Uint8Array, store: Store): Hono<WebA
             namespace = storedUser.namespace
         }
 
-        const token = await new SignJWT({ uid: userId, ns: namespace })
+        const token = await new SignJWT({ uid: userId, ns: namespace, mc: mustChange ? 1 : 0 })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt()
             .setExpirationTime('15m')
@@ -76,6 +108,7 @@ export function createAuthRoutes(jwtSecret: Uint8Array, store: Store): Hono<WebA
 
         return c.json({
             token,
+            mustChangePassword: mustChange,
             user: {
                 id: userId,
                 username,
@@ -83,6 +116,35 @@ export function createAuthRoutes(jwtSecret: Uint8Array, store: Store): Hono<WebA
                 lastName
             }
         })
+    })
+
+    app.post('/auth/change-password', async (c) => {
+        const json = await c.req.json().catch(() => null)
+        const parsed = changePasswordSchema.safeParse(json)
+        if (!parsed.success) {
+            return c.json({ error: 'Invalid body' }, 400)
+        }
+        const parsedToken = parseAccessToken(parsed.data.accessToken)
+        if (!parsedToken || !constantTimeEquals(parsedToken.baseToken, configuration.cliApiToken)) {
+            return c.json({ error: 'Invalid access token' }, 401)
+        }
+        const check = await verifyPassword(parsedToken.namespace, parsed.data.currentPassword)
+        if (!check.valid) {
+            return c.json({ error: 'Current password is incorrect' }, 401)
+        }
+        if (parsed.data.newPassword === parsed.data.currentPassword) {
+            return c.json({ error: 'New password must differ from current password' }, 400)
+        }
+        await changePassword(parsedToken.namespace, parsed.data.newPassword)
+
+        const userId = await getOrCreateOwnerId()
+        const token = await new SignJWT({ uid: userId, ns: parsedToken.namespace, mc: 0 })
+            .setProtectedHeader({ alg: 'HS256' })
+            .setIssuedAt()
+            .setExpirationTime('15m')
+            .sign(jwtSecret)
+
+        return c.json({ success: true, token })
     })
 
     return app

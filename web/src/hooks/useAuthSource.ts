@@ -3,6 +3,7 @@ import { getTelegramWebApp, isTelegramEnvironment } from './useTelegram'
 import type { AuthSource } from './useAuth'
 
 const ACCESS_TOKEN_PREFIX = 'hapi_access_token::'
+const ACCESS_PASSWORD_PREFIX = 'hapi_access_password::'
 
 function getTelegramInitData(): string | null {
     const tg = getTelegramWebApp()
@@ -31,7 +32,11 @@ function getAccessTokenKey(baseUrl: string): string {
     return `${ACCESS_TOKEN_PREFIX}${baseUrl}`
 }
 
-function getStoredAccessToken(key: string): string | null {
+function getAccessPasswordKey(baseUrl: string): string {
+    return `${ACCESS_PASSWORD_PREFIX}${baseUrl}`
+}
+
+function readLS(key: string): string | null {
     try {
         return localStorage.getItem(key)
     } catch {
@@ -39,27 +44,40 @@ function getStoredAccessToken(key: string): string | null {
     }
 }
 
-function storeAccessToken(key: string, token: string): void {
+function writeLS(key: string, value: string): void {
     try {
-        localStorage.setItem(key, token)
+        localStorage.setItem(key, value)
     } catch {
-        // Ignore storage errors
+        // Ignore
     }
 }
 
-function clearStoredAccessToken(key: string): void {
+function removeLS(key: string): void {
     try {
         localStorage.removeItem(key)
     } catch {
-        // Ignore storage errors
+        // Ignore
     }
+}
+
+function getStoredAccessToken(key: string): string | null {
+    return readLS(key)
+}
+
+function storeAccessToken(key: string, token: string): void {
+    writeLS(key, token)
+}
+
+function clearStoredAccessToken(key: string): void {
+    removeLS(key)
 }
 
 export function useAuthSource(baseUrl: string): {
     authSource: AuthSource | null
     isLoading: boolean
     isTelegram: boolean
-    setAccessToken: (token: string) => void
+    setAccessToken: (token: string, password?: string) => void
+    updatePassword: (password: string) => void
     clearAuth: () => void
 } {
     const [authSource, setAuthSource] = useState<AuthSource | null>(null)
@@ -67,6 +85,7 @@ export function useAuthSource(baseUrl: string): {
     const [isTelegram, setIsTelegram] = useState(false)
     const retryCountRef = useRef(0)
     const accessTokenKey = useMemo(() => getAccessTokenKey(baseUrl), [baseUrl])
+    const accessPasswordKey = useMemo(() => getAccessPasswordKey(baseUrl), [baseUrl])
 
     // Initialize auth source on mount, with retry for delayed Telegram initData
     useEffect(() => {
@@ -96,8 +115,9 @@ export function useAuthSource(baseUrl: string): {
 
         // Check for stored access token as fallback
         const storedToken = getStoredAccessToken(accessTokenKey)
+        const storedPassword = readLS(accessPasswordKey) ?? undefined
         if (storedToken) {
-            setAuthSource({ type: 'accessToken', token: storedToken })
+            setAuthSource({ type: 'accessToken', token: storedToken, password: storedPassword })
             setIsLoading(false)
             return
         }
@@ -135,21 +155,36 @@ export function useAuthSource(baseUrl: string): {
         }
     }, [accessTokenKey])
 
-    const setAccessToken = useCallback((token: string) => {
+    const setAccessToken = useCallback((token: string, password?: string) => {
         storeAccessToken(accessTokenKey, token)
-        setAuthSource({ type: 'accessToken', token })
-    }, [accessTokenKey])
+        if (password) {
+            writeLS(accessPasswordKey, password)
+        } else {
+            removeLS(accessPasswordKey)
+        }
+        setAuthSource({ type: 'accessToken', token, password })
+    }, [accessTokenKey, accessPasswordKey])
+
+    const updatePassword = useCallback((password: string) => {
+        writeLS(accessPasswordKey, password)
+        setAuthSource((prev) => {
+            if (!prev || prev.type !== 'accessToken') return prev
+            return { ...prev, password }
+        })
+    }, [accessPasswordKey])
 
     const clearAuth = useCallback(() => {
         clearStoredAccessToken(accessTokenKey)
+        removeLS(accessPasswordKey)
         setAuthSource(null)
-    }, [accessTokenKey])
+    }, [accessTokenKey, accessPasswordKey])
 
     return {
         authSource,
         isLoading,
         isTelegram,
         setAccessToken,
+        updatePassword,
         clearAuth
     }
 }
