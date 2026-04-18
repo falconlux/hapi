@@ -52,6 +52,26 @@ argument-hint: [hub|web|cli|all]
    SKILL_DIR=/Users/luxiang/workspace/hapi/.claude/skills/deploy-mokaclaude
    cp "$SKILL_DIR"/icons/*.png "$SKILL_DIR"/icons/*.ico "$SKILL_DIR"/icons/*.svg .
 
+   # b2. html lang en -> zh-CN
+   sed -i '' 's|<html lang="en">|<html lang="zh-CN">|g' index.html 404.html
+
+   # b3. JS 默认语言 fallback en -> zh-CN
+   python3 <<'PYEOF'
+import glob
+for f in glob.glob("assets/index-*.js"):
+    s = open(f).read()
+    new = s.replace(
+        'hapi-lang");return l==="en"||l==="zh-CN"?l:"en"',
+        'hapi-lang");return l==="en"||l==="zh-CN"?l:"zh-CN"'
+    )
+    if new != s:
+        open(f,"w").write(new)
+PYEOF
+
+   # b4. 隐藏 Terminal 按钮
+   STYLE='<style>button[aria-label="Terminal"],button[aria-label="终端"]{display:none!important}</style>'
+   grep -q 'aria-label="终端"' index.html || sed -i '' "s|</head>|${STYLE}</head>|" index.html
+
    # c. 改 bundle 文件名破缓存（因为 vite 对同名文件打 immutable 1 年 cache）
    cd assets
    OLD_JS=$(ls index-*.js | grep -v moka | head -1 || echo "")
@@ -111,6 +131,22 @@ else:
    - 新版本号（cli/package.json version + web/build-number.json build）
    - 各组件部署状态
    - 提示浏览器刷新 / 重装 PWA
+
+## 特殊分支：密码认证功能
+
+MokaClaude 专属的"访问令牌 + 密码"双因素登录**只在 `mokaclaude-password-auth` 分支有源码**（切勿合入 main）。
+
+**部署时：**
+1. `git checkout mokaclaude-password-auth`
+2. 跑下面的构建 + 部署流程
+3. `git checkout main`（保留分支，不 merge）
+
+**功能要点（已在源码里实现）：**
+- `hub/src/config/passwordStore.ts` — bcrypt + `~/.hapi/passwords.json`
+- `hub/src/web/routes/auth.ts` — 登录要 password；首次自动创 `moka123` + `mustChange=true`
+- `POST /api/auth/change-password` — 改密
+- Web `LoginPrompt.tsx` 加密码框；`ChangePasswordModal.tsx` 首次强制改密
+- `settings` 页有"修改密码"入口
 
 ## 注意事项
 
