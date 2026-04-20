@@ -176,9 +176,10 @@ export function NewSession(props: {
         if (paths[0]) {
             setDirectory(paths[0])
         } else {
-            setDirectory('')
+            const m = props.machines.find((x) => x.id === newMachineId)
+            setDirectory(m?.metadata?.cwd ?? '')
         }
-    }, [getRecentPaths])
+    }, [getRecentPaths, props.machines])
 
     const handlePathClick = useCallback((path: string) => {
         setDirectory(path)
