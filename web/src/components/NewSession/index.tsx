@@ -88,8 +88,11 @@ export function NewSession(props: {
             setMachineId(foundLast.id)
             const paths = getRecentPaths(foundLast.id)
             if (paths[0]) setDirectory(paths[0])
+            else if (foundLast.metadata?.cwd) setDirectory(foundLast.metadata.cwd)
         } else if (props.machines[0]) {
             setMachineId(props.machines[0].id)
+            const first = props.machines[0]
+            if (first.metadata?.cwd) setDirectory(first.metadata.cwd)
         }
     }, [props.machines, machineId, getLastUsedMachineId, getRecentPaths])
 

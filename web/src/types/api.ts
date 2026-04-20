@@ -66,6 +66,8 @@ export type Machine = {
         platform: string
         happyCliVersion: string
         displayName?: string
+        cwd?: string
+        homeDir?: string
     } | null
     runnerState?: RunnerState | null
 }

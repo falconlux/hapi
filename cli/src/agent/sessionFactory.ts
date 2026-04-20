@@ -43,6 +43,7 @@ export function buildMachineMetadata(): MachineMetadata {
         platform: os.platform(),
         happyCliVersion: packageJson.version,
         homeDir: os.homedir(),
+        cwd: process.cwd(),
         happyHomeDir: configuration.happyHomeDir,
         happyLibDir: runtimePath()
     }

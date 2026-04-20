@@ -9,6 +9,7 @@ const machineMetadataSchema = z.object({
     happyCliVersion: z.string().optional(),
     displayName: z.string().optional(),
     homeDir: z.string().optional(),
+    cwd: z.string().optional(),
     happyHomeDir: z.string().optional(),
     happyLibDir: z.string().optional()
 })
@@ -27,6 +28,7 @@ export interface Machine {
         happyCliVersion: string
         displayName?: string
         homeDir?: string
+        cwd?: string
         happyHomeDir?: string
         happyLibDir?: string
     } | null
@@ -99,9 +101,10 @@ export class MachineCache {
             const happyCliVersion = typeof data.happyCliVersion === 'string' ? data.happyCliVersion : 'unknown'
             const displayName = typeof data.displayName === 'string' ? data.displayName : undefined
             const homeDir = typeof data.homeDir === 'string' ? data.homeDir : undefined
+            const cwd = typeof data.cwd === 'string' ? data.cwd : undefined
             const happyHomeDir = typeof data.happyHomeDir === 'string' ? data.happyHomeDir : undefined
             const happyLibDir = typeof data.happyLibDir === 'string' ? data.happyLibDir : undefined
-            return { host, platform, happyCliVersion, displayName, homeDir, happyHomeDir, happyLibDir }
+            return { host, platform, happyCliVersion, displayName, homeDir, cwd, happyHomeDir, happyLibDir }
         })()
 
         const storedActiveAt = stored.activeAt ?? stored.createdAt
