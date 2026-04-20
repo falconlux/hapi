@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { z } from 'zod'
 import { configuration } from '../configuration'
 
-const DEFAULT_PASSWORD = 'moka123'
+const DEFAULT_PASSWORD = 'asdasd'
 
 const entrySchema = z.object({
     hash: z.string(),
