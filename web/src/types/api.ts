@@ -115,6 +115,18 @@ export type UsageResponse = {
     rateLimitTier?: string
 }
 
+export type CswapAccount = {
+    idx: number
+    email: string
+    isActive: boolean
+    fiveHourPct: number | null
+    fiveHourResets: string | null
+    sevenDayPct: number | null
+    sevenDayResets: string | null
+}
+
+export type CswapAccountsResponse = { accounts: CswapAccount[] }
+
 export type MachinesResponse = { machines: Machine[] }
 export type MachinePathsExistsResponse = { exists: Record<string, boolean> }
 

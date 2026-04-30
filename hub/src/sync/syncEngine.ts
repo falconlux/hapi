@@ -159,6 +159,20 @@ export class SyncEngine {
         return null
     }
 
+    async getCswapAccounts(namespace: string): Promise<unknown> {
+        const machines = this.machineCache.getOnlineMachinesByNamespace(namespace)
+        if (machines.length === 0) return null
+        for (const machine of machines) {
+            try {
+                const result = await this.rpcGateway.getCswapAccounts(machine.id)
+                if (result) return result
+            } catch (err) {
+                console.log(`[cswap] error on ${machine.id}: ${err instanceof Error ? err.message : String(err)}`)
+            }
+        }
+        return null
+    }
+
     getOnlineMachines(): Machine[] {
         return this.machineCache.getOnlineMachines()
     }
