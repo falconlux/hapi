@@ -4,8 +4,8 @@ import type { ClaudeComposerModelOption } from './claudeModelOptions'
 
 export type ModelOption = ClaudeComposerModelOption
 
-function getGeminiModelOptions(currentModel?: string | null): ModelOption[] {
-    const options = MODEL_OPTIONS.gemini.map((m) => ({
+function getPresetModelOptions(flavor: 'gemini' | 'codex', currentModel?: string | null): ModelOption[] {
+    const options = MODEL_OPTIONS[flavor].map((m) => ({
         value: m.value === 'auto' ? null : m.value,
         label: m.label
     }))
@@ -16,8 +16,8 @@ function getGeminiModelOptions(currentModel?: string | null): ModelOption[] {
     return options
 }
 
-function getNextGeminiModel(currentModel?: string | null): string | null {
-    const options = getGeminiModelOptions(currentModel)
+function getNextPresetModel(flavor: 'gemini' | 'codex', currentModel?: string | null): string | null {
+    const options = getPresetModelOptions(flavor, currentModel)
     const currentIndex = options.findIndex((o) => o.value === (currentModel ?? null))
     if (currentIndex === -1) {
         return options[0]?.value ?? null
@@ -26,15 +26,15 @@ function getNextGeminiModel(currentModel?: string | null): string | null {
 }
 
 export function getModelOptionsForFlavor(flavor: string | undefined | null, currentModel?: string | null): ModelOption[] {
-    if (flavor === 'gemini') {
-        return getGeminiModelOptions(currentModel)
+    if (flavor === 'gemini' || flavor === 'codex') {
+        return getPresetModelOptions(flavor, currentModel)
     }
     return getClaudeComposerModelOptions(currentModel)
 }
 
 export function getNextModelForFlavor(flavor: string | undefined | null, currentModel?: string | null): string | null {
-    if (flavor === 'gemini') {
-        return getNextGeminiModel(currentModel)
+    if (flavor === 'gemini' || flavor === 'codex') {
+        return getNextPresetModel(flavor, currentModel)
     }
     return getNextClaudeComposerModel(currentModel)
 }

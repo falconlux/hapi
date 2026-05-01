@@ -6,6 +6,7 @@ import type { Store, StoredSession } from '../../../store'
 import type { SyncEvent } from '../../../sync/syncEngine'
 import { extractTodoWriteTodosFromMessageContent } from '../../../sync/todos'
 import { extractTeamStateFromMessageContent, applyTeamStateDelta } from '../../../sync/teams'
+import { rehostImagesInMessage } from '../../../services/imageRehost'
 import type { CliSocketWithData } from '../../socketTypes'
 import type { AccessErrorReason, AccessResult } from './types'
 
@@ -66,7 +67,7 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
     // Track recently seen content uuids to deduplicate messages from Socket.IO reconnect buffer
     const recentContentUuids = new Set<string>()
 
-    socket.on('message', (data: unknown, ack?: () => void) => {
+    socket.on('message', async (data: unknown, ack?: () => void) => {
         const parsed = messageSchema.safeParse(data)
         if (!parsed.success) {
             ack?.()
@@ -137,9 +138,10 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
                 if (first) recentContentUuids.delete(first)
             }
         }
-        const msg = store.messages.addMessage(sid, content, localId, socket.data.clockOffset)
+        const rehosted = await rehostImagesInMessage(content, session.namespace)
+        const msg = store.messages.addMessage(sid, rehosted, localId, socket.data.clockOffset)
 
-        const todos = extractTodoWriteTodosFromMessageContent(content)
+        const todos = extractTodoWriteTodosFromMessageContent(rehosted)
         if (todos) {
             const updated = store.sessions.setSessionTodos(sid, todos, msg.createdAt, session.namespace)
             if (updated) {
@@ -147,7 +149,7 @@ export function registerSessionHandlers(socket: CliSocketWithData, deps: Session
             }
         }
 
-        const teamDelta = extractTeamStateFromMessageContent(content)
+        const teamDelta = extractTeamStateFromMessageContent(rehosted)
         if (teamDelta) {
             const existingSession = store.sessions.getSession(sid)
             const existingTeamState = existingSession?.teamState as import('@hapi/protocol/types').TeamState | null | undefined

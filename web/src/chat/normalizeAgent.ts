@@ -30,6 +30,25 @@ function normalizeToolResultPermissions(value: unknown): ToolResultPermission | 
 // Internal event types that should not be rendered as chat messages
 const HIDDEN_EVENT_TYPES = new Set(['usage', 'ready'])
 
+function extractImageUrl(block: Record<string, unknown>): string | null {
+    if (typeof block.cosFileUrl === 'string' && block.cosFileUrl) return block.cosFileUrl
+    const source = isObject(block.source) ? block.source : null
+    if (!source) return null
+    if (source.type === 'url' && typeof source.url === 'string') return source.url
+    if (source.type === 'base64' && typeof source.data === 'string') {
+        const mt = typeof source.media_type === 'string' ? source.media_type : 'image/png'
+        return `data:${mt};base64,${source.data}`
+    }
+    return null
+}
+
+function extractImageMimeType(block: Record<string, unknown>): string | null {
+    const source = isObject(block.source) ? block.source : null
+    if (source && typeof source.media_type === 'string') return source.media_type
+    if (typeof block.media_type === 'string') return block.media_type
+    return null
+}
+
 function normalizeAgentEvent(value: unknown): AgentEvent | null {
     if (!isObject(value) || typeof value.type !== 'string') return null
     if (HIDDEN_EVENT_TYPES.has(value.type)) return null
@@ -71,6 +90,19 @@ function normalizeAssistantOutput(
                 const input = 'input' in block ? (block as Record<string, unknown>).input : undefined
                 const description = isObject(input) && typeof input.description === 'string' ? input.description : null
                 blocks.push({ type: 'tool-call', id: block.id, name, input, description, uuid, parentUUID })
+                continue
+            }
+            if (block.type === 'image') {
+                const imgUrl = extractImageUrl(block)
+                if (imgUrl) {
+                    blocks.push({
+                        type: 'image',
+                        url: imgUrl,
+                        mimeType: extractImageMimeType(block),
+                        uuid,
+                        parentUUID
+                    })
+                }
             }
         }
     }

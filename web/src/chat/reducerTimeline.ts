@@ -162,6 +162,19 @@ export function reduceTimeline(
                     continue
                 }
 
+                if (c.type === 'image') {
+                    blocks.push({
+                        kind: 'agent-image',
+                        id: `${msg.id}:${idx}`,
+                        localId: msg.localId,
+                        createdAt: msg.createdAt,
+                        url: c.url,
+                        mimeType: c.mimeType,
+                        meta: msg.meta
+                    })
+                    continue
+                }
+
                 if (c.type === 'summary') {
                     blocks.push({
                         kind: 'agent-event',

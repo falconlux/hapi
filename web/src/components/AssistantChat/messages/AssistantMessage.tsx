@@ -3,6 +3,7 @@ import { MarkdownText } from '@/components/assistant-ui/markdown-text'
 import { Reasoning, ReasoningGroup } from '@/components/assistant-ui/reasoning'
 import { HappyToolMessage } from '@/components/AssistantChat/messages/ToolMessage'
 import { CliOutputBlock } from '@/components/CliOutputBlock'
+import { CosFilePreview } from '@/components/CosFilePreview'
 import { CopyIcon, CheckIcon } from '@/components/icons'
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard'
 import type { HappyChatMessageMetadata } from '@/lib/assistant-runtime'
@@ -24,6 +25,11 @@ export function HappyAssistantMessage() {
     const isCliOutput = useAssistantState(({ message }) => {
         const custom = message.metadata.custom as Partial<HappyChatMessageMetadata> | undefined
         return custom?.kind === 'cli-output'
+    })
+    const imageUrl = useAssistantState(({ message }) => {
+        const custom = message.metadata.custom as Partial<HappyChatMessageMetadata> | undefined
+        if (custom?.kind !== 'agent-image') return null
+        return custom.imageUrl ?? null
     })
     const cliText = useAssistantState(({ message }) => {
         const custom = message.metadata.custom as Partial<HappyChatMessageMetadata> | undefined
@@ -47,6 +53,14 @@ export function HappyAssistantMessage() {
         return (
             <MessagePrimitive.Root className="px-1 min-w-0 max-w-full overflow-x-hidden">
                 <CliOutputBlock text={cliText} />
+            </MessagePrimitive.Root>
+        )
+    }
+
+    if (imageUrl) {
+        return (
+            <MessagePrimitive.Root className="px-1 min-w-0 max-w-full overflow-x-hidden">
+                <CosFilePreview url={imageUrl} forceImage />
             </MessagePrimitive.Root>
         )
     }
