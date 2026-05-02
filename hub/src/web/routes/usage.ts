@@ -50,6 +50,36 @@ async function fetchUsageViaRpc(getSyncEngine: () => SyncEngine | null, namespac
     }
 }
 
+interface CswapAccount {
+    idx: number
+    email: string
+    isActive: boolean
+    fiveHourPct: number | null
+    fiveHourResets: string | null
+    sevenDayPct: number | null
+    sevenDayResets: string | null
+}
+
+const cachedCswapByNamespace = new Map<string, { data: { accounts: CswapAccount[] }; timestamp: number }>()
+const CSWAP_CACHE_TTL = 60_000 // 1 min
+
+async function fetchCswapViaRpc(getSyncEngine: () => SyncEngine | null, namespace: string) {
+    const now = Date.now()
+    const cached = cachedCswapByNamespace.get(namespace)
+    if (cached && (now - cached.timestamp) < CSWAP_CACHE_TTL) return cached.data
+    const syncEngine = getSyncEngine()
+    if (!syncEngine) return cached?.data ?? null
+    try {
+        const data = await syncEngine.getCswapAccounts(namespace) as { accounts: CswapAccount[] } | null
+        if (data?.accounts?.length) {
+            cachedCswapByNamespace.set(namespace, { data, timestamp: now })
+        }
+        return data ?? cached?.data ?? null
+    } catch {
+        return cached?.data ?? null
+    }
+}
+
 export function createUsageRoutes(getSyncEngine: () => SyncEngine | null) {
     const app = new Hono<WebAppEnv>()
 
@@ -59,6 +89,12 @@ export function createUsageRoutes(getSyncEngine: () => SyncEngine | null) {
             return c.json({ error: 'Unable to fetch usage data' }, 503)
         }
         return c.json(usage)
+    })
+
+    app.get('/usage/accounts', async (c) => {
+        const data = await fetchCswapViaRpc(getSyncEngine, c.get('namespace'))
+        if (!data) return c.json({ accounts: [] })
+        return c.json(data)
     })
 
     return app

@@ -8,7 +8,7 @@ import type { AgentEvent, ToolCallBlock } from '@/chat/types'
 import type { AttachmentMetadata, MessageStatus as HappyMessageStatus, Session } from '@/types/api'
 
 export type HappyChatMessageMetadata = {
-    kind: 'user' | 'assistant' | 'tool' | 'event' | 'cli-output'
+    kind: 'user' | 'assistant' | 'tool' | 'event' | 'cli-output' | 'agent-image'
     status?: HappyMessageStatus
     localId?: string | null
     originalText?: string
@@ -17,6 +17,8 @@ export type HappyChatMessageMetadata = {
     source?: CliOutputBlock['source']
     attachments?: AttachmentMetadata[]
     showTimestamp?: boolean
+    imageUrl?: string
+    imageMimeType?: string | null
 }
 
 let prevBlockCreatedAt = 0
@@ -85,6 +87,23 @@ function toThreadMessageLike(block: ChatBlock): ThreadMessageLike {
             content: [{ type: 'text', text: renderEventLabel(block.event) }],
             metadata: {
                 custom: { kind: 'event', event: block.event } satisfies HappyChatMessageMetadata
+            }
+        }
+    }
+
+    if (block.kind === 'agent-image') {
+        const messageId = `assistant:${block.id}`
+        return {
+            role: 'assistant',
+            id: messageId,
+            createdAt: new Date(block.createdAt),
+            content: [{ type: 'text', text: '' }],
+            metadata: {
+                custom: {
+                    kind: 'agent-image',
+                    imageUrl: block.url,
+                    imageMimeType: block.mimeType
+                } satisfies HappyChatMessageMetadata
             }
         }
     }

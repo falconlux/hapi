@@ -7,7 +7,7 @@ import { getFontScaleOptions, useFontScale, type FontScale } from '@/hooks/useFo
 import { getTerminalFontSizeOptions, useTerminalFontSize, type TerminalFontSize } from '@/hooks/useTerminalFontSize'
 import { useAppearance, getAppearanceOptions, type AppearancePreference } from '@/hooks/useTheme'
 import { PROTOCOL_VERSION } from '@hapi/protocol'
-import type { UsageResponse } from '@/types/api'
+import type { UsageResponse, CswapAccount } from '@/types/api'
 
 const locales: { value: Locale; nativeLabel: string }[] = [
     { value: 'en', nativeLabel: 'English' },
@@ -88,6 +88,77 @@ function formatResetTime(isoString: string): string {
     return `${minutes}m`
 }
 
+function pctColor(pct: number | null): string {
+    if (pct === null) return 'var(--app-secondary-bg)'
+    if (pct >= 85) return 'var(--app-error, #ef4444)'
+    if (pct >= 60) return 'var(--app-warning, #f59e0b)'
+    return 'var(--app-success, #22c55e)'
+}
+
+function MiniBar({ label, pct, resets }: { label: string; pct: number | null; resets: string | null }) {
+    const value = pct ?? 0
+    const w = Math.min(100, Math.max(0, value))
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-1">
+                <span className="text-[var(--app-fg)] text-xs font-medium">{label}</span>
+                <span className="text-[var(--app-hint)] text-xs tabular-nums">
+                    {pct === null ? '—' : `${pct}%`}
+                    {resets ? <span className="ml-1 opacity-60">· {resets}</span> : null}
+                </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-[var(--app-secondary-bg)] overflow-hidden">
+                <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${w}%`, backgroundColor: pctColor(pct) }}
+                />
+            </div>
+        </div>
+    )
+}
+
+function AccountCard({ acc }: { acc: CswapAccount }) {
+    const isOverLimit = (acc.fiveHourPct ?? 0) >= 85
+    const localPart = acc.email.split('@')[0]
+    const shortName = localPart.length > 16 ? `${localPart.slice(0, 14)}…` : localPart
+
+    return (
+        <div
+            className={`rounded-xl border p-3 transition-colors ${
+                acc.isActive
+                    ? 'border-[var(--app-link)] bg-[var(--app-subtle-bg)]'
+                    : 'border-[var(--app-divider)] bg-transparent'
+            }`}
+        >
+            <div className="flex items-center justify-between mb-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                    <span
+                        aria-hidden
+                        className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${
+                            acc.isActive ? 'bg-[var(--app-link)]' : 'bg-[var(--app-hint)] opacity-40'
+                        }`}
+                    />
+                    <span className="text-[var(--app-fg)] text-sm font-semibold tabular-nums">
+                        #{acc.idx}
+                    </span>
+                    <span className="text-[var(--app-fg)] text-sm truncate" title={acc.email}>
+                        {shortName}
+                    </span>
+                </div>
+                {isOverLimit && (
+                    <span className="text-[10px] uppercase tracking-wide font-semibold text-[var(--app-error,#ef4444)] flex-shrink-0">
+                        OVER
+                    </span>
+                )}
+            </div>
+            <div className="space-y-2">
+                <MiniBar label="5h" pct={acc.fiveHourPct} resets={acc.fiveHourResets} />
+                <MiniBar label="7d" pct={acc.sevenDayPct} resets={acc.sevenDayResets} />
+            </div>
+        </div>
+    )
+}
+
 function UsageBar({ label, utilization, resetsAt, t }: {
     label: string
     utilization: number
@@ -132,6 +203,7 @@ export default function SettingsPage() {
     const { api } = useAppContext()
     const [usage, setUsage] = useState<UsageResponse | null>(null)
     const [usageLoading, setUsageLoading] = useState(true)
+    const [cswapAccounts, setCswapAccounts] = useState<CswapAccount[]>([])
 
     useEffect(() => {
         if (!api) return
@@ -139,6 +211,9 @@ export default function SettingsPage() {
             .then(setUsage)
             .catch(() => setUsage(null))
             .finally(() => setUsageLoading(false))
+        api.getCswapAccounts()
+            .then(r => setCswapAccounts(r.accounts ?? []))
+            .catch(() => setCswapAccounts([]))
     }, [api])
 
     // Voice language state - read from localStorage
@@ -521,51 +596,60 @@ export default function SettingsPage() {
                         <div className="px-3 py-2 text-xs font-semibold text-[var(--app-hint)] uppercase tracking-wide">
                             {t('settings.usage.title')}
                         </div>
-                        {usageLoading ? (
-                            <div className="px-3 py-3 text-[var(--app-hint)] text-sm">Loading...</div>
-                        ) : usage ? (
-                            <div className="px-3 py-2 space-y-3">
-                                {usage.subscriptionType && (
-                                    <div className="flex items-center justify-between py-1">
-                                        <span className="text-[var(--app-fg)] text-sm">{t('settings.usage.plan')}</span>
-                                        <span className="text-[var(--app-hint)] text-sm capitalize">{usage.subscriptionType}</span>
-                                    </div>
-                                )}
-                                {usage.five_hour && (
-                                    <UsageBar
-                                        label={t('settings.usage.fiveHour')}
-                                        utilization={usage.five_hour.utilization}
-                                        resetsAt={usage.five_hour.resets_at}
-                                        t={t}
-                                    />
-                                )}
-                                {usage.seven_day && (
-                                    <UsageBar
-                                        label={t('settings.usage.sevenDay')}
-                                        utilization={usage.seven_day.utilization}
-                                        resetsAt={usage.seven_day.resets_at}
-                                        t={t}
-                                    />
-                                )}
-                                {usage.seven_day_opus && (
-                                    <UsageBar
-                                        label={t('settings.usage.sevenDayOpus')}
-                                        utilization={usage.seven_day_opus.utilization}
-                                        resetsAt={usage.seven_day_opus.resets_at}
-                                        t={t}
-                                    />
-                                )}
-                                {usage.seven_day_sonnet && (
-                                    <UsageBar
-                                        label={t('settings.usage.sevenDaySonnet')}
-                                        utilization={usage.seven_day_sonnet.utilization}
-                                        resetsAt={usage.seven_day_sonnet.resets_at}
-                                        t={t}
-                                    />
-                                )}
+                        {cswapAccounts.length > 0 && (
+                            <div className="px-3 pt-2 pb-1 space-y-2">
+                                {cswapAccounts.map(acc => (
+                                    <AccountCard key={acc.idx} acc={acc} />
+                                ))}
                             </div>
-                        ) : (
-                            <div className="px-3 py-3 text-[var(--app-hint)] text-sm">{t('settings.usage.unavailable')}</div>
+                        )}
+                        {cswapAccounts.length === 0 && (
+                            usageLoading ? (
+                                <div className="px-3 py-3 text-[var(--app-hint)] text-sm">Loading...</div>
+                            ) : usage ? (
+                                <div className="px-3 py-2 space-y-3">
+                                    {usage.subscriptionType && (
+                                        <div className="flex items-center justify-between py-1">
+                                            <span className="text-[var(--app-fg)] text-sm">{t('settings.usage.plan')}</span>
+                                            <span className="text-[var(--app-hint)] text-sm capitalize">{usage.subscriptionType}</span>
+                                        </div>
+                                    )}
+                                    {usage.five_hour && (
+                                        <UsageBar
+                                            label={t('settings.usage.fiveHour')}
+                                            utilization={usage.five_hour.utilization}
+                                            resetsAt={usage.five_hour.resets_at}
+                                            t={t}
+                                        />
+                                    )}
+                                    {usage.seven_day && (
+                                        <UsageBar
+                                            label={t('settings.usage.sevenDay')}
+                                            utilization={usage.seven_day.utilization}
+                                            resetsAt={usage.seven_day.resets_at}
+                                            t={t}
+                                        />
+                                    )}
+                                    {usage.seven_day_opus && (
+                                        <UsageBar
+                                            label={t('settings.usage.sevenDayOpus')}
+                                            utilization={usage.seven_day_opus.utilization}
+                                            resetsAt={usage.seven_day_opus.resets_at}
+                                            t={t}
+                                        />
+                                    )}
+                                    {usage.seven_day_sonnet && (
+                                        <UsageBar
+                                            label={t('settings.usage.sevenDaySonnet')}
+                                            utilization={usage.seven_day_sonnet.utilization}
+                                            resetsAt={usage.seven_day_sonnet.resets_at}
+                                            t={t}
+                                        />
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="px-3 py-3 text-[var(--app-hint)] text-sm">{t('settings.usage.unavailable')}</div>
+                            )
                         )}
                     </div>
 

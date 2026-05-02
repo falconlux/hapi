@@ -276,6 +276,10 @@ export class RpcGateway {
         return await this.machineRpc(machineId, 'getOAuthUsage', {})
     }
 
+    async getCswapAccounts(machineId: string): Promise<unknown> {
+        return await this.machineRpc(machineId, 'getCswapAccounts', {})
+    }
+
     private async sessionRpc(sessionId: string, method: string, params: unknown, timeoutMs?: number): Promise<unknown> {
         return await this.rpcCall(`${sessionId}:${method}`, params, timeoutMs)
     }

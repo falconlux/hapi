@@ -132,6 +132,64 @@ export class ApiMachineClient {
                 return null
             }
         })
+
+        this.rpcHandlerManager.registerHandler('getCswapAccounts', async () => {
+            try {
+                const { execSync } = await import('child_process')
+                const candidates = ['/Users/luxiang/.local/bin/cswap', '/opt/homebrew/bin/cswap', 'cswap']
+                let raw = ''
+                for (const bin of candidates) {
+                    try {
+                        raw = execSync(`${bin} --list`, { encoding: 'utf-8', timeout: 8000 })
+                        if (raw) break
+                    } catch {}
+                }
+                if (!raw) return null
+
+                const accounts: Array<{
+                    idx: number
+                    email: string
+                    isActive: boolean
+                    fiveHourPct: number | null
+                    fiveHourResets: string | null
+                    sevenDayPct: number | null
+                    sevenDayResets: string | null
+                }> = []
+                let cur: typeof accounts[number] | null = null
+                for (const line of raw.split('\n')) {
+                    const head = line.match(/^\s*(\d+):\s+(\S+@\S+)/)
+                    if (head) {
+                        if (cur) accounts.push(cur)
+                        cur = {
+                            idx: parseInt(head[1], 10),
+                            email: head[2],
+                            isActive: line.includes('(active)'),
+                            fiveHourPct: null,
+                            fiveHourResets: null,
+                            sevenDayPct: null,
+                            sevenDayResets: null
+                        }
+                        continue
+                    }
+                    if (!cur) continue
+                    const five = line.match(/5h:\s+(\d+)%(?:\s+resets\s+([^\n]+?))?$/)
+                    if (five) {
+                        cur.fiveHourPct = parseInt(five[1], 10)
+                        cur.fiveHourResets = five[2]?.trim() ?? null
+                        continue
+                    }
+                    const seven = line.match(/7d:\s+(\d+)%(?:\s+resets\s+([^\n]+?))?$/)
+                    if (seven) {
+                        cur.sevenDayPct = parseInt(seven[1], 10)
+                        cur.sevenDayResets = seven[2]?.trim() ?? null
+                    }
+                }
+                if (cur) accounts.push(cur)
+                return accounts.length > 0 ? { accounts } : null
+            } catch {
+                return null
+            }
+        })
     }
 
     setRPCHandlers({ spawnSession, stopSession, requestShutdown }: MachineRpcHandlers): void {

@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { SyntaxHighlighter } from '@/components/assistant-ui/shiki-highlighter'
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard'
 import { CopyIcon, CheckIcon } from '@/components/icons'
+import { ImageLightbox } from '@/components/ImageLightbox'
 
 export const MARKDOWN_PLUGINS = [remarkGfm, remarkDisableIndentedCode]
 
@@ -189,7 +190,22 @@ function Em(props: ComponentPropsWithoutRef<'em'>) {
 }
 
 function Image(props: ComponentPropsWithoutRef<'img'>) {
-    return <img {...props} className={cn('aui-md-img max-w-full rounded', props.className)} />
+    const { src, alt, className, ...rest } = props
+    const url = typeof src === 'string' ? src : ''
+    const altText = typeof alt === 'string' ? alt : ''
+    if (!url) {
+        return <img {...props} className={cn('aui-md-img max-w-full rounded', className)} />
+    }
+    return (
+        <ImageLightbox src={url} alt={altText} downloadUrl={url} filename={altText || 'image'}>
+            <img
+                {...rest}
+                src={url}
+                alt={altText}
+                className={cn('aui-md-img max-w-full rounded cursor-zoom-in', className)}
+            />
+        </ImageLightbox>
+    )
 }
 
 export const defaultComponents = memoizeMarkdownComponents({

@@ -1,6 +1,7 @@
 import type {
     AgentEvent,
     AgentEventBlock,
+    AgentImageBlock,
     AgentReasoningBlock,
     AgentTextBlock,
     ChatBlock,
@@ -211,6 +212,11 @@ function reconcileBlock(block: ChatBlock, prevById: ChatBlocksById): ChatBlock {
     if (block.kind === 'agent-reasoning') {
         const prevBlock = prev as AgentReasoningBlock
         return areAgentReasoningBlocksEqual(prevBlock, block) ? prevBlock : block
+    }
+
+    if (block.kind === 'agent-image') {
+        const prevBlock = prev as AgentImageBlock
+        return prevBlock.url === block.url && prevBlock.mimeType === block.mimeType ? prevBlock : block
     }
 
     const prevBlock = prev as AgentEventBlock

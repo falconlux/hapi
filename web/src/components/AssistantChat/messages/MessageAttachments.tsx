@@ -1,5 +1,6 @@
 import type { AttachmentMetadata } from '@/types/api'
 import { FileIcon } from '@/components/FileIcon'
+import { ImageLightbox } from '@/components/ImageLightbox'
 import { isImageMimeType } from '@/lib/fileAttachments'
 
 function formatFileSize(bytes: number): string {
@@ -10,19 +11,29 @@ function formatFileSize(bytes: number): string {
 
 function ImageAttachment(props: { attachment: AttachmentMetadata }) {
     const { attachment } = props
+    const previewUrl = attachment.previewUrl
+    if (!previewUrl) return null
+
     return (
-        <div className="relative overflow-hidden rounded-lg">
-            <img
-                src={attachment.previewUrl}
-                alt={attachment.filename}
-                className="max-h-48 max-w-full object-contain"
-            />
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5">
-                <span className="text-xs text-white/90 line-clamp-1">
-                    {attachment.filename}
-                </span>
+        <ImageLightbox
+            src={previewUrl}
+            alt={attachment.filename}
+            downloadUrl={previewUrl}
+            filename={attachment.filename}
+        >
+            <div className="relative overflow-hidden rounded-lg">
+                <img
+                    src={previewUrl}
+                    alt={attachment.filename}
+                    className="max-h-48 max-w-full object-contain cursor-pointer"
+                />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5">
+                    <span className="text-xs text-white/90 line-clamp-1">
+                        {attachment.filename}
+                    </span>
+                </div>
             </div>
-        </div>
+        </ImageLightbox>
     )
 }
 

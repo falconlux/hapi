@@ -21,7 +21,8 @@ import type {
     VisibilityPayload,
     SessionResponse,
     SessionsResponse,
-    UsageResponse
+    UsageResponse,
+    CswapAccountsResponse
 } from '@/types/api'
 
 type ApiClientOptions = {
@@ -381,6 +382,10 @@ export class ApiClient {
 
     async getUsage(): Promise<UsageResponse> {
         return await this.request<UsageResponse>('/api/usage')
+    }
+
+    async getCswapAccounts(): Promise<CswapAccountsResponse> {
+        return await this.request<CswapAccountsResponse>('/api/usage/accounts')
     }
 
     async getMachines(): Promise<MachinesResponse> {

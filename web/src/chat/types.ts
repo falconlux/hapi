@@ -51,6 +51,14 @@ export type ToolResult = {
     cosFileUrl?: string
 }
 
+export type AgentImageContent = {
+    type: 'image'
+    url: string
+    mimeType: string | null
+    uuid: string
+    parentUUID: string | null
+}
+
 export type NormalizedAgentContent =
     | {
         type: 'text'
@@ -66,6 +74,7 @@ export type NormalizedAgentContent =
     }
     | ToolUse
     | ToolResult
+    | AgentImageContent
     | { type: 'summary'; summary: string }
     | { type: 'sidechain'; uuid: string; parentUUID: string | null; prompt: string }
 
@@ -174,4 +183,14 @@ export type ToolCallBlock = {
     meta?: unknown
 }
 
-export type ChatBlock = UserTextBlock | AgentTextBlock | AgentReasoningBlock | CliOutputBlock | ToolCallBlock | AgentEventBlock
+export type AgentImageBlock = {
+    kind: 'agent-image'
+    id: string
+    localId: string | null
+    createdAt: number
+    url: string
+    mimeType: string | null
+    meta?: unknown
+}
+
+export type ChatBlock = UserTextBlock | AgentTextBlock | AgentReasoningBlock | CliOutputBlock | ToolCallBlock | AgentEventBlock | AgentImageBlock
