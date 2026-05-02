@@ -11,7 +11,7 @@ const config = {
     SecretKey: process.env.COS_SECRET_KEY || '',
     Bucket: process.env.COS_BUCKET || 'video-1314491040',
     Region: process.env.COS_REGION || 'ap-nanjing',
-    CdnDomain: process.env.COS_CDN_DOMAIN || 'https://x.rattletrap.cn',
+    CdnDomain: process.env.COS_CDN_DOMAIN || '',
 }
 
 let cosClient: COS | null = null

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { ImageLightbox } from '@/components/ImageLightbox'
 
 function getFileTypeFromUrl(url: string): 'image' | 'video' | 'pdf' | 'other' {
     const lower = url.toLowerCase()
@@ -18,30 +18,24 @@ function getFilenameFromUrl(url: string): string {
 }
 
 export function CosFilePreview({ url, forceImage = false }: { url: string; forceImage?: boolean }) {
-    const [expanded, setExpanded] = useState(false)
     const type = forceImage ? 'image' : getFileTypeFromUrl(url)
     const filename = getFilenameFromUrl(url)
 
     if (type === 'image') {
         return (
             <div className="mt-2">
-                <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+                <ImageLightbox src={url} alt={filename} downloadUrl={url} filename={filename} triggerClassName="inline-block max-w-full">
                     <div className="relative rounded-lg overflow-hidden border border-[var(--app-border)] bg-[var(--app-bg-secondary)] inline-block max-w-full">
                         <img
                             src={url}
                             alt={filename}
                             className="max-h-[400px] max-w-full object-contain cursor-pointer"
-                            onClick={(e) => {
-                                e.preventDefault()
-                                setExpanded(!expanded)
-                            }}
-                            style={expanded ? { maxHeight: 'none' } : undefined}
                         />
                         <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-2 py-1 text-xs text-white truncate">
                             {filename}
                         </div>
                     </div>
-                </a>
+                </ImageLightbox>
             </div>
         )
     }

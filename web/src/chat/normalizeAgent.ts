@@ -243,6 +243,21 @@ function normalizeUserOutput(
                     permissions,
                     cosFileUrl,
                 })
+                if (Array.isArray(rawContent)) {
+                    for (const child of rawContent) {
+                        if (!isObject(child) || child.type !== 'image') continue
+                        const imgUrl = extractImageUrl(child)
+                        if (imgUrl) {
+                            blocks.push({
+                                type: 'image',
+                                url: imgUrl,
+                                mimeType: extractImageMimeType(child),
+                                uuid,
+                                parentUUID
+                            })
+                        }
+                    }
+                }
             }
         }
     }
