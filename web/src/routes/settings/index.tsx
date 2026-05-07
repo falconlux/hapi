@@ -117,7 +117,7 @@ function MiniBar({ label, pct, resets }: { label: string; pct: number | null; re
     )
 }
 
-function AccountCard({ acc, onSwitch }: { acc: CswapAccount; onSwitch?: (idx: number) => void }) {
+function AccountCard({ acc, onSwitch, switching }: { acc: CswapAccount; onSwitch?: (idx: number) => void; switching?: boolean }) {
     const isOverLimit = (acc.fiveHourPct ?? 0) >= 85
     const localPart = acc.email.split('@')[0]
     const shortName = localPart.length > 16 ? `${localPart.slice(0, 14)}…` : localPart
@@ -154,9 +154,10 @@ function AccountCard({ acc, onSwitch }: { acc: CswapAccount; onSwitch?: (idx: nu
                     {!acc.isActive && onSwitch && (
                         <button
                             onClick={() => onSwitch(acc.idx)}
-                            className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--app-link)] text-[var(--app-link)] hover:bg-[var(--app-link)] hover:text-white transition-colors"
+                            disabled={switching}
+                            className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--app-link)] text-[var(--app-link)] hover:bg-[var(--app-link)] hover:text-white transition-colors disabled:opacity-50"
                         >
-                            切换
+                            {switching ? '切换中…' : '切换'}
                         </button>
                     )}
                 </div>
@@ -214,6 +215,7 @@ export default function SettingsPage() {
     const [usage, setUsage] = useState<UsageResponse | null>(null)
     const [usageLoading, setUsageLoading] = useState(true)
     const [cswapAccounts, setCswapAccounts] = useState<CswapAccount[]>([])
+    const [switchingIdx, setSwitchingIdx] = useState<number | null>(null)
 
     useEffect(() => {
         if (!api) return
@@ -609,13 +611,15 @@ export default function SettingsPage() {
                         {cswapAccounts.length > 0 && (
                             <div className="px-3 pt-2 pb-1 space-y-2">
                                 {cswapAccounts.map(acc => (
-                                    <AccountCard key={acc.idx} acc={acc} onSwitch={async (idx) => {
-                                        if (!api) return
-                                        const result = await api.switchCswapAccount(idx)
-                                        if (result.success) {
+                                    <AccountCard key={acc.idx} acc={acc} switching={switchingIdx === acc.idx} onSwitch={async (idx) => {
+                                        if (!api || switchingIdx !== null) return
+                                        setSwitchingIdx(idx)
+                                        try {
+                                            await api.switchCswapAccount(idx)
                                             const refreshed = await api.getCswapAccounts()
                                             setCswapAccounts(refreshed.accounts ?? [])
-                                        }
+                                        } catch {}
+                                        setSwitchingIdx(null)
                                     }} />
                                 ))}
                             </div>
