@@ -388,6 +388,13 @@ export class ApiClient {
         return await this.request<CswapAccountsResponse>('/api/usage/accounts')
     }
 
+    async switchCswapAccount(idx: number): Promise<{ success: boolean; error?: string }> {
+        return await this.request<{ success: boolean; error?: string }>('/api/usage/accounts/switch', {
+            method: 'POST',
+            body: JSON.stringify({ idx })
+        })
+    }
+
     async getMachines(): Promise<MachinesResponse> {
         return await this.request<MachinesResponse>('/api/machines')
     }

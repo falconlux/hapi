@@ -190,6 +190,26 @@ export class ApiMachineClient {
                 return null
             }
         })
+
+        this.rpcHandlerManager.registerHandler('switchCswapAccount', async (params: unknown) => {
+            try {
+                const { idx } = params as { idx: number }
+                if (typeof idx !== 'number' || idx < 1) return { success: false, error: 'Invalid idx' }
+                const { execSync } = await import('child_process')
+                const candidates = ['/Users/luxiang/.local/bin/cswap', '/opt/homebrew/bin/cswap', 'cswap']
+                let output = ''
+                for (const bin of candidates) {
+                    try {
+                        output = execSync(`${bin} --switch-to ${idx}`, { encoding: 'utf-8', timeout: 10000 })
+                        if (output) break
+                    } catch {}
+                }
+                const success = /switched|success|now using/i.test(output)
+                return { success, output: output.slice(0, 500) }
+            } catch (err) {
+                return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+            }
+        })
     }
 
     setRPCHandlers({ spawnSession, stopSession, requestShutdown }: MachineRpcHandlers): void {

@@ -173,6 +173,19 @@ export class SyncEngine {
         return null
     }
 
+    async switchCswapAccount(namespace: string, idx: number): Promise<unknown> {
+        const machines = this.machineCache.getOnlineMachinesByNamespace(namespace)
+        if (machines.length === 0) return { success: false, error: 'No online machines' }
+        for (const machine of machines) {
+            try {
+                return await this.rpcGateway.switchCswapAccount(machine.id, idx)
+            } catch (err) {
+                console.log(`[cswap-switch] error on ${machine.id}: ${err instanceof Error ? err.message : String(err)}`)
+            }
+        }
+        return { success: false, error: 'All machines failed' }
+    }
+
     getOnlineMachines(): Machine[] {
         return this.machineCache.getOnlineMachines()
     }

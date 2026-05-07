@@ -117,7 +117,7 @@ function MiniBar({ label, pct, resets }: { label: string; pct: number | null; re
     )
 }
 
-function AccountCard({ acc }: { acc: CswapAccount }) {
+function AccountCard({ acc, onSwitch }: { acc: CswapAccount; onSwitch?: (idx: number) => void }) {
     const isOverLimit = (acc.fiveHourPct ?? 0) >= 85
     const localPart = acc.email.split('@')[0]
     const shortName = localPart.length > 16 ? `${localPart.slice(0, 14)}…` : localPart
@@ -145,11 +145,21 @@ function AccountCard({ acc }: { acc: CswapAccount }) {
                         {shortName}
                     </span>
                 </div>
-                {isOverLimit && (
-                    <span className="text-[10px] uppercase tracking-wide font-semibold text-[var(--app-error,#ef4444)] flex-shrink-0">
-                        OVER
-                    </span>
-                )}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    {isOverLimit && (
+                        <span className="text-[10px] uppercase tracking-wide font-semibold text-[var(--app-error,#ef4444)]">
+                            OVER
+                        </span>
+                    )}
+                    {!acc.isActive && onSwitch && (
+                        <button
+                            onClick={() => onSwitch(acc.idx)}
+                            className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--app-link)] text-[var(--app-link)] hover:bg-[var(--app-link)] hover:text-white transition-colors"
+                        >
+                            切换
+                        </button>
+                    )}
+                </div>
             </div>
             <div className="space-y-2">
                 <MiniBar label="5h" pct={acc.fiveHourPct} resets={acc.fiveHourResets} />
@@ -599,7 +609,14 @@ export default function SettingsPage() {
                         {cswapAccounts.length > 0 && (
                             <div className="px-3 pt-2 pb-1 space-y-2">
                                 {cswapAccounts.map(acc => (
-                                    <AccountCard key={acc.idx} acc={acc} />
+                                    <AccountCard key={acc.idx} acc={acc} onSwitch={async (idx) => {
+                                        if (!api) return
+                                        const result = await api.switchCswapAccount(idx)
+                                        if (result.success) {
+                                            const refreshed = await api.getCswapAccounts()
+                                            setCswapAccounts(refreshed.accounts ?? [])
+                                        }
+                                    }} />
                                 ))}
                             </div>
                         )}
