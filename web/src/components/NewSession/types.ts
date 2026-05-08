@@ -7,7 +7,7 @@ export type ClaudeEffort = 'auto' | 'medium' | 'high' | 'max'
 
 export const MODEL_OPTIONS: Record<AgentType, { value: string; label: string }[]> = {
     claude: [
-        { value: 'auto', label: 'Auto' },
+        { value: 'auto', label: 'Default' },
         { value: 'claude-opus-4-6', label: 'Opus 4.6' },
         { value: 'claude-opus-4-6[1m]', label: 'Opus 4.6 1M' },
         { value: 'claude-opus-4-7', label: 'Opus 4.7' },
@@ -16,7 +16,7 @@ export const MODEL_OPTIONS: Record<AgentType, { value: string; label: string }[]
         { value: 'sonnet[1m]', label: 'Sonnet 1M' },
     ],
     codex: [
-        { value: 'auto', label: 'Auto' },
+        { value: 'auto', label: 'Default' },
         { value: 'gpt-5.5', label: 'GPT-5.5' },
         { value: 'gpt-5.4', label: 'GPT-5.4' },
         { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },

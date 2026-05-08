@@ -30,6 +30,7 @@ interface LoopOptions {
     codexCliOverrides?: CodexCliOverrides;
     permissionMode?: PermissionMode;
     model?: string;
+    modelReasoningEffort?: ReasoningEffort;
     collaborationMode?: CodexCollaborationMode;
     resumeSessionId?: string;
     onSessionReady?: (session: CodexSession) => void;
@@ -52,8 +53,9 @@ export async function loop(opts: LoopOptions): Promise<void> {
         startingMode,
         codexArgs: opts.codexArgs,
         codexCliOverrides: opts.codexCliOverrides,
-        permissionMode: opts.permissionMode ?? 'bypassPermissions',
+        permissionMode: opts.permissionMode ?? 'yolo',
         model: opts.model,
+        modelReasoningEffort: opts.modelReasoningEffort,
         collaborationMode: opts.collaborationMode ?? 'default'
     });
 

@@ -9,9 +9,10 @@ const machineMetadataSchema = z.object({
     happyCliVersion: z.string().optional(),
     displayName: z.string().optional(),
     homeDir: z.string().optional(),
-    cwd: z.string().optional(),
     happyHomeDir: z.string().optional(),
-    happyLibDir: z.string().optional()
+    happyLibDir: z.string().optional(),
+    workspaceRoot: z.string().optional(),
+    workspaceRoots: z.array(z.string()).optional()
 })
 
 export interface Machine {
@@ -28,9 +29,9 @@ export interface Machine {
         happyCliVersion: string
         displayName?: string
         homeDir?: string
-        cwd?: string
         happyHomeDir?: string
         happyLibDir?: string
+        workspaceRoots?: string[]
     } | null
     metadataVersion: number
     runnerState: unknown | null
@@ -101,10 +102,25 @@ export class MachineCache {
             const happyCliVersion = typeof data.happyCliVersion === 'string' ? data.happyCliVersion : 'unknown'
             const displayName = typeof data.displayName === 'string' ? data.displayName : undefined
             const homeDir = typeof data.homeDir === 'string' ? data.homeDir : undefined
-            const cwd = typeof data.cwd === 'string' ? data.cwd : undefined
             const happyHomeDir = typeof data.happyHomeDir === 'string' ? data.happyHomeDir : undefined
             const happyLibDir = typeof data.happyLibDir === 'string' ? data.happyLibDir : undefined
-            return { host, platform, happyCliVersion, displayName, homeDir, cwd, happyHomeDir, happyLibDir }
+            const workspaceRoots = Array.from(new Set(
+                Array.isArray(data.workspaceRoots)
+                    ? data.workspaceRoots.filter((path): path is string => typeof path === 'string' && path.trim().length > 0)
+                    : typeof data.workspaceRoot === 'string'
+                        ? [data.workspaceRoot]
+                        : []
+            ))
+            return {
+                host,
+                platform,
+                happyCliVersion,
+                displayName,
+                homeDir,
+                happyHomeDir,
+                happyLibDir,
+                workspaceRoots: workspaceRoots.length > 0 ? workspaceRoots : undefined
+            }
         })()
 
         const storedActiveAt = stored.activeAt ?? stored.createdAt

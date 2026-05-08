@@ -113,7 +113,7 @@ export function ImageLightbox(props: ImageLightboxProps) {
     const handleTouchStart = (event: TouchEvent<HTMLImageElement>) => {
         stopGesture(event)
         if (event.touches.length === 2) {
-            pinchRef.current = { distance: distance(event.touches), transform: transformRef.current }
+            pinchRef.current = { distance: distance(Array.from(event.touches) as unknown as TouchList), transform: transformRef.current }
             panRef.current = null
             return
         }
@@ -133,8 +133,8 @@ export function ImageLightbox(props: ImageLightboxProps) {
         stopGesture(event)
         if (event.touches.length === 2 && pinchRef.current) {
             const start = pinchRef.current
-            const currentMidpoint = midpoint(event.touches)
-            const currentDistance = distance(event.touches)
+            const currentMidpoint = midpoint(Array.from(event.touches) as unknown as TouchList)
+            const currentDistance = distance(Array.from(event.touches) as unknown as TouchList)
             zoomAt(currentMidpoint, start.transform.scale * (currentDistance / start.distance), start.transform)
             return
         }

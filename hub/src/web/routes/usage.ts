@@ -97,5 +97,20 @@ export function createUsageRoutes(getSyncEngine: () => SyncEngine | null) {
         return c.json(data)
     })
 
+    app.post('/usage/accounts/switch', async (c) => {
+        const body = await c.req.json().catch(() => null)
+        const idx = body?.idx
+        if (typeof idx !== 'number' || idx < 1) {
+            return c.json({ success: false, error: 'Invalid idx' }, 400)
+        }
+        const syncEngine = getSyncEngine()
+        if (!syncEngine) {
+            return c.json({ success: false, error: 'No sync engine' }, 503)
+        }
+        const result = await syncEngine.switchCswapAccount(c.get('namespace'), idx) as { success: boolean; error?: string }
+        cachedCswapByNamespace.delete(c.get('namespace'))
+        return c.json(result, result.success ? 200 : 500)
+    })
+
     return app
 }

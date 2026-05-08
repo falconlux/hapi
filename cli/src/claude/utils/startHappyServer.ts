@@ -12,22 +12,30 @@ import { logger } from "@/ui/logger";
 import { ApiSessionClient } from "@/api/apiSession";
 import { randomUUID } from "node:crypto";
 
-export async function startHappyServer(client: ApiSessionClient) {
+type StartHappyServerOptions = {
+    emitTitleSummary?: boolean;
+};
+
+export async function startHappyServer(client: ApiSessionClient, options: StartHappyServerOptions = {}) {
+    const emitTitleSummary = options.emitTitleSummary ?? true;
+
     // Handler that sends title updates via the client
     const handler = async (title: string) => {
         logger.debug('[hapiMCP] Changing title to:', title);
 
         try {
-            // Send title as a summary message, similar to title generator
-            client.sendClaudeSessionMessage({
-                type: 'summary',
-                summary: title,
-                leafUuid: randomUUID()
-            });
+            if (emitTitleSummary) {
+                // Send title as a summary message, similar to title generator.
+                client.sendClaudeSessionMessage({
+                    type: 'summary',
+                    summary: title,
+                    leafUuid: randomUUID()
+                });
+            }
 
-            return { success: true, skipped: false };
+            return { success: true };
         } catch (error) {
-            return { success: false, skipped: false, error: String(error) };
+            return { success: false, error: String(error) };
         }
     };
 
@@ -53,17 +61,7 @@ export async function startHappyServer(client: ApiSessionClient) {
         const response = await handler(args.title);
         logger.debug('[hapiMCP] Response:', response);
         
-        if (response.success && response.skipped) {
-            return {
-                content: [
-                    {
-                        type: 'text' as const,
-                        text: `Title not changed - this session has been manually renamed by the user. Auto-renaming is disabled for manually renamed sessions.`,
-                    },
-                ],
-                isError: false,
-            };
-        } else if (response.success) {
+        if (response.success) {
             return {
                 content: [
                     {

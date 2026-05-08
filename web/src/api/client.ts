@@ -7,9 +7,12 @@ import type {
     FileReadResponse,
     FileSearchResponse,
     GitCommandResponse,
+    MachineListDirectoryResponse,
     MachinePathsExistsResponse,
     MachinesResponse,
     MessagesResponse,
+    CodexModelsResponse,
+    OpencodeModelsResponse,
     PermissionMode,
     PushSubscriptionPayload,
     PushUnsubscribePayload,
@@ -24,6 +27,7 @@ import type {
     UsageResponse,
     CswapAccountsResponse
 } from '@/types/api'
+import type { CancelMessageResponse } from '@hapi/protocol/schemas'
 
 type ApiClientOptions = {
     baseUrl?: string
@@ -124,7 +128,7 @@ export class ApiClient {
         return await res.json() as T
     }
 
-    async authenticate(auth: { initData: string } | { accessToken: string; password?: string }): Promise<AuthResponse> {
+    async authenticate(auth: { initData: string } | { accessToken: string }): Promise<AuthResponse> {
         const res = await fetch(this.buildUrl('/api/auth'), {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -139,21 +143,6 @@ export class ApiClient {
         }
 
         return await res.json() as AuthResponse
-    }
-
-    async changePassword(args: { accessToken: string; currentPassword: string; newPassword: string }): Promise<{ success: true; token: string }> {
-        const res = await fetch(this.buildUrl('/api/auth/change-password'), {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(args)
-        })
-        if (!res.ok) {
-            const body = await res.text().catch(() => '')
-            const code = parseErrorCode(body)
-            const detail = body ? `: ${body}` : ''
-            throw new ApiError(`Change password failed: HTTP ${res.status} ${res.statusText}${detail}`, res.status, code, body || undefined)
-        }
-        return await res.json() as { success: true; token: string }
     }
 
     async bind(auth: { initData: string; accessToken: string }): Promise<AuthResponse> {
@@ -206,8 +195,23 @@ export class ApiClient {
         return await this.request<SessionResponse>(`/api/sessions/${encodeURIComponent(sessionId)}`)
     }
 
-    async getMessages(sessionId: string, options: { beforeSeq?: number | null; afterSeq?: number | null; limit?: number }): Promise<MessagesResponse> {
+    async getMessages(
+        sessionId: string,
+        options: {
+            beforeSeq?: number | null
+            afterSeq?: number | null
+            beforeAt?: number | null
+            byPosition?: boolean
+            limit?: number
+        }
+    ): Promise<MessagesResponse> {
         const params = new URLSearchParams()
+        if (options.byPosition || options.beforeAt !== undefined && options.beforeAt !== null) {
+            params.set('byPosition', '1')
+        }
+        if (options.beforeAt !== undefined && options.beforeAt !== null) {
+            params.set('beforeAt', `${options.beforeAt}`)
+        }
         if (options.afterSeq !== undefined && options.afterSeq !== null) {
             params.set('afterSeq', `${options.afterSeq}`)
         } else if (options.beforeSeq !== undefined && options.beforeSeq !== null) {
@@ -285,12 +289,14 @@ export class ApiClient {
         })
     }
 
-    async resumeSession(sessionId: string, resumeWithSessionId?: string): Promise<string> {
+    async resumeSession(sessionId: string, opts?: { permissionMode?: string }): Promise<string> {
         const response = await this.request<{ sessionId: string }>(
             `/api/sessions/${encodeURIComponent(sessionId)}/resume`,
             {
                 method: 'POST',
-                ...(resumeWithSessionId ? { body: JSON.stringify({ resumeWithSessionId }) } : {})
+                ...(opts?.permissionMode !== undefined && {
+                    body: JSON.stringify({ permissionMode: opts.permissionMode })
+                })
             }
         )
         return response.sessionId
@@ -312,6 +318,14 @@ export class ApiClient {
                 attachments: attachments ?? undefined
             })
         })
+    }
+
+    async cancelMessage(sessionId: string, messageId: string): Promise<CancelMessageResponse> {
+        const response = await this.request(
+            `/api/sessions/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(messageId)}`,
+            { method: 'DELETE' }
+        )
+        return response as CancelMessageResponse
     }
 
     async abortSession(sessionId: string): Promise<void> {
@@ -353,6 +367,13 @@ export class ApiClient {
         await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/model`, {
             method: 'POST',
             body: JSON.stringify({ model })
+        })
+    }
+
+    async setModelReasoningEffort(sessionId: string, modelReasoningEffort: string | null): Promise<void> {
+        await this.request(`/api/sessions/${encodeURIComponent(sessionId)}/model-reasoning-effort`, {
+            method: 'POST',
+            body: JSON.stringify({ modelReasoningEffort })
         })
     }
 
@@ -403,8 +424,28 @@ export class ApiClient {
         return await this.request<CswapAccountsResponse>('/api/usage/accounts')
     }
 
+    async switchCswapAccount(idx: number): Promise<{ success: boolean; error?: string }> {
+        return await this.request<{ success: boolean; error?: string }>('/api/usage/accounts/switch', {
+            method: 'POST',
+            body: JSON.stringify({ idx })
+        })
+    }
+
     async getMachines(): Promise<MachinesResponse> {
         return await this.request<MachinesResponse>('/api/machines')
+    }
+
+    async listMachineDirectory(
+        machineId: string,
+        path: string
+    ): Promise<MachineListDirectoryResponse> {
+        return await this.request<MachineListDirectoryResponse>(
+            `/api/machines/${encodeURIComponent(machineId)}/list-directory`,
+            {
+                method: 'POST',
+                body: JSON.stringify({ path })
+            }
+        )
     }
 
     async checkMachinePathsExists(
@@ -436,6 +477,30 @@ export class ApiClient {
             method: 'POST',
             body: JSON.stringify({ directory, agent, model, modelReasoningEffort, yolo, sessionType, worktreeName, effort, sandbox })
         })
+    }
+
+    async getMachineCodexModels(machineId: string): Promise<CodexModelsResponse> {
+        return await this.request<CodexModelsResponse>(
+            `/api/machines/${encodeURIComponent(machineId)}/codex-models`
+        )
+    }
+
+    async getSessionCodexModels(sessionId: string): Promise<CodexModelsResponse> {
+        return await this.request<CodexModelsResponse>(
+            `/api/sessions/${encodeURIComponent(sessionId)}/codex-models`
+        )
+    }
+
+    async getSessionOpencodeModels(sessionId: string): Promise<OpencodeModelsResponse> {
+        return await this.request<OpencodeModelsResponse>(
+            `/api/sessions/${encodeURIComponent(sessionId)}/opencode-models`
+        )
+    }
+
+    async getMachineOpencodeModelsForCwd(machineId: string, cwd: string): Promise<OpencodeModelsResponse> {
+        return await this.request<OpencodeModelsResponse>(
+            `/api/machines/${encodeURIComponent(machineId)}/opencode-models?cwd=${encodeURIComponent(cwd)}`
+        )
     }
 
     async getSlashCommands(sessionId: string): Promise<SlashCommandsResponse> {
