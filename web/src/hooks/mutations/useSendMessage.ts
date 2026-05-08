@@ -27,7 +27,33 @@ type UseSendMessageOptions = {
     resolveSessionId?: (sessionId: string) => Promise<string>
     onSessionResolved?: (sessionId: string) => void
     onBlocked?: (reason: BlockedReason) => void
+    onSuccess?: (sessionId: string) => void
     thinking?: boolean
+}
+
+/** Create an optimistic message for display. Extracted as an extension point
+ *  so a future floating-UI PR can route queued messages to a separate area. */
+function createOptimisticMessage(input: SendMessageInput, status: 'queued' | 'sending'): DecryptedMessage {
+    return {
+        id: input.localId,
+        seq: null,
+        localId: input.localId,
+        content: {
+            role: 'user',
+            content: {
+                type: 'text',
+                text: input.text,
+                attachments: input.attachments
+            }
+        },
+        createdAt: input.createdAt,
+        // Explicit null so the strict-null queued check matches. A pre-V8 hub
+        // response that omits the field entirely (`undefined`) is treated as
+        // already-invoked and stays in the thread, not the floating bar.
+        invokedAt: null,
+        status,
+        originalText: input.text,
+    }
 }
 
 function findMessageByLocalId(
@@ -120,8 +146,9 @@ export function useSendMessage(
                 scheduleTurnLockRelease(input.sessionId, input.localId)
             }
             haptic.notification('success')
+            options?.onSuccess?.(input.sessionId)
             if (api) {
-                const doFetch = () => fetchLatestMessages(api, input.sessionId, { incremental: true }).catch(() => {})
+                const doFetch = () => fetchLatestMessages(api, input.sessionId).catch(() => {})
                 doFetch()
                 setTimeout(doFetch, 1000)
                 setTimeout(doFetch, 3000)
@@ -170,7 +197,7 @@ export function useSendMessage(
                 setIsResolving(false)
             }
         }
-        await fetchLatestMessages(targetApi, targetSessionId, { incremental: true }).catch(() => {})
+        await fetchLatestMessages(targetApi, targetSessionId).catch(() => {})
 
         // Update optimistic message status from queued to sending
         updateMessageStatus(targetSessionId, localId, 'sending')
@@ -224,18 +251,13 @@ export function useSendMessage(
         if (!sessionId) return
         const state = queue.getState(sessionId)
         for (const item of state.items) {
-            appendOptimisticMessage(sessionId, {
-                id: item.localId,
-                seq: null,
+            appendOptimisticMessage(sessionId, createOptimisticMessage({
+                sessionId,
                 localId: item.localId,
-                content: {
-                    role: 'user',
-                    content: { type: 'text', text: item.text, attachments: item.attachments }
-                },
+                text: item.text,
                 createdAt: item.createdAt,
-                status: 'queued',
-                originalText: item.text,
-            })
+                attachments: item.attachments,
+            }, 'queued'))
         }
     }, [sessionId])
 
@@ -266,35 +288,15 @@ export function useSendMessage(
         if (busy) {
             // Enqueue and show optimistic bubble with 'queued' status
             queue.enqueue(sessionId, { localId, text, attachments, createdAt })
-            const optimisticMessage: DecryptedMessage = {
-                id: localId,
-                seq: null,
-                localId,
-                content: {
-                    role: 'user',
-                    content: { type: 'text', text, attachments }
-                },
-                createdAt,
-                status: 'queued',
-                originalText: text,
-            }
-            appendOptimisticMessage(sessionId, optimisticMessage)
+            appendOptimisticMessage(sessionId, createOptimisticMessage({
+                sessionId, localId, text, createdAt, attachments
+            }, 'queued'))
             haptic.impact('light')
         } else {
             // Dispatch immediately
-            const optimisticMessage: DecryptedMessage = {
-                id: localId,
-                seq: null,
-                localId,
-                content: {
-                    role: 'user',
-                    content: { type: 'text', text, attachments }
-                },
-                createdAt,
-                status: 'sending',
-                originalText: text,
-            }
-            appendOptimisticMessage(sessionId, optimisticMessage)
+            appendOptimisticMessage(sessionId, createOptimisticMessage({
+                sessionId, localId, text, createdAt, attachments
+            }, 'sending'))
             queue.setInFlight(sessionId, localId)
             void dispatchMessage(api, sessionId, text, localId, createdAt, attachments)
         }

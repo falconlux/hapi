@@ -5,6 +5,10 @@ export type UsageData = {
     output_tokens: number
     cache_creation_input_tokens?: number
     cache_read_input_tokens?: number
+    context_tokens?: number
+    context_window?: number
+    thread_id?: string
+    scope_role?: string
     service_tier?: string
 }
 
@@ -16,7 +20,7 @@ export type AgentEvent =
     | { type: 'limit-warning'; /** 0–1 ratio (e.g. 0.9 = 90%), integer-precision via CLI pipe format */ utilization: number; endsAt: number; limitType: string }
     | { type: 'ready' }
     | { type: 'api-error'; retryAttempt: number; maxRetries: number; error: unknown }
-    | { type: 'turn-duration'; durationMs: number }
+    | { type: 'turn-duration'; durationMs: number; targetMessageId?: string }
     | { type: 'microcompact'; trigger: string; preTokens: number; tokensSaved: number }
     | { type: 'compact'; trigger: string; preTokens: number }
     | { type: 'usage'; totalCostUsd: number; totalInputTokens: number; totalOutputTokens: number }
@@ -96,6 +100,8 @@ export type NormalizedMessage = ({
     usage?: UsageData
     status?: MessageStatus
     originalText?: string
+    invokedAt?: number | null
+    model?: string | null
 }
 
 export type ToolPermission = {
@@ -130,6 +136,7 @@ export type UserTextBlock = {
     id: string
     localId: string | null
     createdAt: number
+    invokedAt?: number | null
     text: string
     attachments?: AttachmentMetadata[]
     status?: MessageStatus
@@ -142,6 +149,10 @@ export type AgentTextBlock = {
     id: string
     localId: string | null
     createdAt: number
+    invokedAt?: number | null
+    durationMs?: number
+    usage?: UsageData
+    model?: string | null
     text: string
     meta?: unknown
 }
@@ -151,6 +162,10 @@ export type AgentReasoningBlock = {
     id: string
     localId: string | null
     createdAt: number
+    invokedAt?: number | null
+    durationMs?: number
+    usage?: UsageData
+    model?: string | null
     text: string
     meta?: unknown
 }
@@ -160,6 +175,10 @@ export type CliOutputBlock = {
     id: string
     localId: string | null
     createdAt: number
+    invokedAt?: number | null
+    durationMs?: number
+    usage?: UsageData
+    model?: string | null
     text: string
     source: 'user' | 'assistant'
     meta?: unknown
@@ -169,6 +188,8 @@ export type AgentEventBlock = {
     kind: 'agent-event'
     id: string
     createdAt: number
+    invokedAt?: number | null
+    model?: string | null
     event: AgentEvent
     meta?: unknown
 }
@@ -178,6 +199,10 @@ export type ToolCallBlock = {
     id: string
     localId: string | null
     createdAt: number
+    invokedAt?: number | null
+    durationMs?: number
+    usage?: UsageData
+    model?: string | null
     tool: ChatToolCall
     children: ChatBlock[]
     meta?: unknown

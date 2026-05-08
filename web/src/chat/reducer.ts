@@ -7,7 +7,14 @@ import { reduceTimeline } from '@/chat/reducerTimeline'
 
 // Calculate context size from usage data
 function calculateContextSize(usage: UsageData): number {
+    if (typeof usage.context_tokens === 'number') {
+        return usage.context_tokens
+    }
     return (usage.cache_creation_input_tokens || 0) + (usage.cache_read_input_tokens || 0) + usage.input_tokens
+}
+
+function isUsageVisibleInParentContext(usage: UsageData): boolean {
+    return usage.scope_role !== 'child'
 }
 
 export type LatestUsage = {
@@ -16,6 +23,7 @@ export type LatestUsage = {
     cacheCreation: number
     cacheRead: number
     contextSize: number
+    contextWindow: number | null
     timestamp: number
     totalCostUsd?: number
     totalInputTokens?: number
@@ -97,13 +105,14 @@ export function reduceChatBlocks(
     let latestUsage: LatestUsage | null = null
     for (let i = normalized.length - 1; i >= 0; i--) {
         const msg = normalized[i]
-        if (msg.usage) {
+        if (msg.usage && isUsageVisibleInParentContext(msg.usage)) {
             latestUsage = {
                 inputTokens: msg.usage.input_tokens,
                 outputTokens: msg.usage.output_tokens,
                 cacheCreation: msg.usage.cache_creation_input_tokens ?? 0,
                 cacheRead: msg.usage.cache_read_input_tokens ?? 0,
                 contextSize: calculateContextSize(msg.usage),
+                contextWindow: msg.usage.context_window ?? null,
                 timestamp: msg.createdAt
             }
             break
@@ -126,6 +135,7 @@ export function reduceChatBlocks(
                     cacheCreation: 0,
                     cacheRead: 0,
                     contextSize: 0,
+                    contextWindow: null,
                     timestamp: msg.createdAt,
                     totalCostUsd: event.totalCostUsd,
                     totalInputTokens: event.totalInputTokens,

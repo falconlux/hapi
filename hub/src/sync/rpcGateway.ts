@@ -2,6 +2,9 @@ import type { CodexCollaborationMode, PermissionMode } from '@hapi/protocol/type
 import type { Server } from 'socket.io'
 import type { RpcRegistry } from '../socket/rpcRegistry'
 
+const DEFAULT_RPC_TIMEOUT_MS = 30_000
+const MODEL_LIST_RPC_TIMEOUT_MS = 120_000
+
 export type RpcCommandResponse = {
     success: boolean
     stdout?: string
@@ -42,6 +45,32 @@ export type RpcListDirectoryResponse = {
 
 export type RpcPathExistsResponse = {
     exists: Record<string, boolean>
+}
+
+export type RpcCodexModel = {
+    id: string
+    displayName: string
+    isDefault: boolean
+    defaultReasoningEffort?: string | null
+    supportedReasoningEfforts?: string[]
+}
+
+export type RpcListCodexModelsResponse = {
+    success: boolean
+    models?: RpcCodexModel[]
+    error?: string
+}
+
+export type RpcOpencodeModel = {
+    modelId: string
+    name?: string
+}
+
+export type RpcListOpencodeModelsResponse = {
+    success: boolean
+    availableModels?: RpcOpencodeModel[]
+    currentModelId?: string | null
+    error?: string
 }
 
 export class RpcGateway {
@@ -94,6 +123,7 @@ export class RpcGateway {
         config: {
             permissionMode?: PermissionMode
             model?: string | null
+            modelReasoningEffort?: string | null
             effort?: string | null
             collaborationMode?: CodexCollaborationMode
         }
@@ -124,13 +154,14 @@ export class RpcGateway {
         worktreeName?: string,
         resumeSessionId?: string,
         effort?: string,
-        sandbox?: boolean
+        sandbox?: boolean,
+        permissionMode?: PermissionMode
     ): Promise<{ type: 'success'; sessionId: string } | { type: 'error'; message: string }> {
         try {
             const result = await this.machineRpc(
                 machineId,
                 'spawn-happy-session',
-                { type: 'spawn-in-directory', directory, agent, model, modelReasoningEffort, yolo, sessionType, worktreeName, resumeSessionId, effort, sandbox }
+                { type: 'spawn-in-directory', directory, agent, model, modelReasoningEffort, yolo, sessionType, worktreeName, resumeSessionId, effort, sandbox, permissionMode }
             )
             if (result && typeof result === 'object') {
                 const obj = result as Record<string, unknown>
@@ -163,6 +194,14 @@ export class RpcGateway {
         } catch (error) {
             return { type: 'error', message: error instanceof Error ? error.message : String(error) }
         }
+    }
+
+    async listMachineDirectory(machineId: string, path: string): Promise<RpcListDirectoryResponse> {
+        const result = await this.machineRpc(machineId, 'list-directory', { path }) as RpcListDirectoryResponse | unknown
+        if (!result || typeof result !== 'object') {
+            return { success: false, error: 'Unexpected list-directory result' }
+        }
+        return result as RpcListDirectoryResponse
     }
 
     async checkPathsExist(machineId: string, paths: string[]): Promise<Record<string, boolean>> {
@@ -284,15 +323,41 @@ export class RpcGateway {
         return await this.machineRpc(machineId, 'switchCswapAccount', { idx })
     }
 
-    private async sessionRpc(sessionId: string, method: string, params: unknown, timeoutMs?: number): Promise<unknown> {
+    async listCodexModelsForSession(sessionId: string): Promise<RpcListCodexModelsResponse> {
+        return await this.sessionRpc(sessionId, 'listCodexModels', {}, MODEL_LIST_RPC_TIMEOUT_MS) as RpcListCodexModelsResponse
+    }
+
+    async listCodexModelsForMachine(machineId: string): Promise<RpcListCodexModelsResponse> {
+        return await this.machineRpc(machineId, 'listCodexModels', {}, MODEL_LIST_RPC_TIMEOUT_MS) as RpcListCodexModelsResponse
+    }
+
+    async listOpencodeModelsForSession(sessionId: string): Promise<RpcListOpencodeModelsResponse> {
+        return await this.sessionRpc(sessionId, 'listOpencodeModels', {}) as RpcListOpencodeModelsResponse
+    }
+
+    async listOpencodeModelsForCwd(machineId: string, cwd: string): Promise<RpcListOpencodeModelsResponse> {
+        return await this.machineRpc(machineId, 'listOpencodeModelsForCwd', { cwd }) as RpcListOpencodeModelsResponse
+    }
+
+    private async sessionRpc(
+        sessionId: string,
+        method: string,
+        params: unknown,
+        timeoutMs: number = DEFAULT_RPC_TIMEOUT_MS
+    ): Promise<unknown> {
         return await this.rpcCall(`${sessionId}:${method}`, params, timeoutMs)
     }
 
-    private async machineRpc(machineId: string, method: string, params: unknown): Promise<unknown> {
-        return await this.rpcCall(`${machineId}:${method}`, params)
+    private async machineRpc(
+        machineId: string,
+        method: string,
+        params: unknown,
+        timeoutMs: number = DEFAULT_RPC_TIMEOUT_MS
+    ): Promise<unknown> {
+        return await this.rpcCall(`${machineId}:${method}`, params, timeoutMs)
     }
 
-    private async rpcCall(method: string, params: unknown, timeoutMs = 30_000): Promise<unknown> {
+    private async rpcCall(method: string, params: unknown, timeoutMs: number = DEFAULT_RPC_TIMEOUT_MS): Promise<unknown> {
         const socketId = this.rpcRegistry.getSocketIdForMethod(method)
         if (!socketId) {
             throw new Error(`RPC handler not registered: ${method}`)
@@ -304,8 +369,6 @@ export class RpcGateway {
         }
 
         const serialized = JSON.stringify(params)
-        const payloadKB = Math.round(serialized.length / 1024)
-        console.log(`[RPC] ${method} payload=${payloadKB}KB timeout=${timeoutMs}ms socketId=${socketId}`)
 
         const response = await socket.timeout(timeoutMs).emitWithAck('rpc-request', {
             method,
