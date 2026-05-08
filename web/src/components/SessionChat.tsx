@@ -144,14 +144,7 @@ export function SessionChat(props: {
         setOutlineOpen(false)
     }, [props.session.id])
 
-    // Exclude user messages that haven't been invoked yet — those appear in the
-    // QueuedMessagesBar above the composer, not in the thread timeline. The
-    // `isQueuedForInvocation` predicate is shared with the window store and the
-    // floating bar so the three views never disagree about queued state.
-    const visibleMessages = useMemo(
-        () => props.messages.filter((m) => !isQueuedForInvocation(m)),
-        [props.messages]
-    )
+    const visibleMessages = props.messages
 
     const normalizedMessages: NormalizedMessage[] = useMemo(() => {
         // Clear caches immediately when session changes (before useEffect runs)
@@ -375,9 +368,6 @@ export function SessionChat(props: {
                         </div>
                     ) : null}
 
-                    <div className="px-3">
-                        <QueuedMessagesBar sessionId={props.session.id} api={props.api} />
-                    </div>
 
                     <HappyComposer
                         key={props.session.id}

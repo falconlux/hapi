@@ -227,7 +227,7 @@ export function StatusBar(props: {
                     </span>
                 ) : null}
                 {cacheHitLabel ? (
-                    <span className="text-[10px] text-[var(--app-hint)]">
+                    <span className="text-[10px] hidden sm:inline text-[var(--app-hint)]">
                         {cacheHitLabel}
                     </span>
                 ) : null}
@@ -240,31 +240,31 @@ export function StatusBar(props: {
                     </span>
                 ) : null}
                 {codexReasoningLabel ? (
-                    <span className="text-xs text-[var(--app-hint)]">
+                    <span className="text-xs hidden sm:inline text-[var(--app-hint)]">
                         {codexReasoningLabel}
                     </span>
                 ) : null}
                 {codexFastMode ? (
-                    <span className="text-xs text-[#34C759]">
+                    <span className="text-xs hidden sm:inline text-[#34C759]">
                         fast
                     </span>
                 ) : null}
                 {props.model ? (
-                    <span className="text-[10px] text-[var(--app-hint)]">
+                    <span className="text-[10px] hidden sm:inline text-[var(--app-hint)]">
                         {getClaudeModelLabel(props.model)}
                     </span>
                 ) : null}
                 {collaborationModeLabel ? (
-                    <span className="text-xs text-blue-500">
+                    <span className="text-xs hidden sm:inline text-blue-500">
                         {collaborationModeLabel}
                     </span>
                 ) : null}
                 {displayPermissionMode ? (
-                    <span className={`text-xs ${permissionModeColor}`}>
+                    <span className={`text-xs hidden sm:inline ${permissionModeColor}`}>
                         {permissionModeLabel}
                     </span>
                 ) : null}
-                <span className="text-[10px] text-[var(--app-hint)]">
+                <span className="text-[10px] hidden sm:inline text-[var(--app-hint)]">
                     v{__APP_VERSION__}
                 </span>
             </div>

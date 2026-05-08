@@ -265,6 +265,7 @@ function SessionPage() {
         retryMessage,
         isSending,
     } = useSendMessage(api, sessionId, {
+        thinking: session?.thinking,
         onSuccess: (sentSessionId) => {
             clearDraftsAfterSend(sentSessionId, sessionId)
         },
