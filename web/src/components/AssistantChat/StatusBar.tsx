@@ -222,12 +222,12 @@ export function StatusBar(props: {
                     </span>
                 </div>
                 {contextUsageLabel ? (
-                    <span className={`text-[10px] ${contextWarning?.color ?? 'text-[var(--app-hint)]'}`}>
+                    <span className={`text-[10px] hidden sm:inline ${contextWarning?.color ?? 'text-[var(--app-hint)]'}`}>
                         {contextUsageLabel}{contextWarning ? ` · ${contextWarning.text}` : ''}
                     </span>
                 ) : null}
                 {cacheHitLabel ? (
-                    <span className="text-[10px] text-[var(--app-hint)]">
+                    <span className="text-[10px] hidden sm:inline text-[var(--app-hint)]">
                         {cacheHitLabel}
                     </span>
                 ) : null}
