@@ -32,6 +32,36 @@ import type { SyncEvent } from '@/types/api'
 type ToastEvent = Extract<SyncEvent, { type: 'toast' }>
 
 const REQUIRE_SERVER_URL = requireHubUrlForLogin()
+const STORAGE_USAGE_CLEANUP_THRESHOLD = 0.8
+
+async function cleanupStorageIfNeeded(): Promise<void> {
+    const estimate = await navigator.storage?.estimate?.()
+    const usage = estimate?.usage
+    const quota = estimate?.quota
+    if (!usage || !quota || usage / quota <= STORAGE_USAGE_CLEANUP_THRESHOLD) {
+        return
+    }
+
+    const deletedCaches: string[] = []
+    if (typeof caches !== 'undefined') {
+        const cacheNames = await caches.keys()
+        const oldCacheNames = cacheNames.filter((name) => !name.includes('precache'))
+        await Promise.all(oldCacheNames.map(async (name) => {
+            if (await caches.delete(name)) {
+                deletedCaches.push(name)
+            }
+        }))
+    }
+
+    const hadSessionStorage = sessionStorage.length > 0
+    sessionStorage.clear()
+    console.warn('Storage usage exceeded 80%; cleared storage', {
+        usage,
+        quota,
+        caches: deletedCaches,
+        sessionStorage: hadSessionStorage
+    })
+}
 
 export function App() {
     return (
@@ -137,6 +167,12 @@ function AppInner() {
         syncTokenRef.current = 0
         queryClient.clear()
     }, [baseUrl, queryClient])
+
+    useEffect(() => {
+        cleanupStorageIfNeeded().catch((error) => {
+            console.warn('Failed to check storage usage:', error)
+        })
+    }, [])
 
     // Clean up URL params after successful auth (for direct access links)
     useEffect(() => {
