@@ -103,6 +103,7 @@ export function PermissionFooter(props: {
     const [loading, setLoading] = useState<'allow' | 'deny' | 'abort' | null>(null)
     const [loadingAllEdits, setLoadingAllEdits] = useState(false)
     const [loadingForSession, setLoadingForSession] = useState(false)
+    const [resolved, setResolved] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     const codex = useMemo(() => isCodexSession(props.metadata, props.tool.name), [props.metadata, props.tool.name])
@@ -110,18 +111,21 @@ export function PermissionFooter(props: {
     if (!permission) return null
 
     const summary = formatPermissionSummary(permission, props.tool.name, props.tool.input, codex, t)
-    const isPending = permission.status === 'pending'
+    const isPending = permission.status === 'pending' && !resolved
 
-    const run = async (action: () => Promise<void>, hapticType: 'success' | 'error') => {
-        if (props.disabled) return
+    const run = async (action: () => Promise<void>, hapticType: 'success' | 'error'): Promise<boolean> => {
+        if (props.disabled) return false
         setError(null)
         try {
             await action()
+            setResolved(true)
             haptic.notification(hapticType)
             props.onDone()
+            return true
         } catch (e) {
             haptic.notification('error')
             setError(e instanceof Error ? e.message : t('tool.requestFailed'))
+            return false
         }
     }
 

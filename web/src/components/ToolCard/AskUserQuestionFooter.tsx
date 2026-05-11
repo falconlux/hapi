@@ -92,6 +92,7 @@ export function AskUserQuestionFooter(props: {
     const [fallbackText, setFallbackText] = useState('')
 
     const [loading, setLoading] = useState(false)
+    const [resolved, setResolved] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
@@ -101,22 +102,26 @@ export function AskUserQuestionFooter(props: {
         setOtherTextByQuestion(questions.map(() => ''))
         setFallbackText('')
         setLoading(false)
+        setResolved(false)
         setError(null)
     }, [props.tool.id])
 
-    if (!permission || permission.status !== 'pending') return null
+    if (!permission || permission.status !== 'pending' || resolved) return null
     if (!isAskUserQuestionToolName(props.tool.name)) return null
 
-    const run = async (action: () => Promise<void>, hapticType: 'success' | 'error') => {
-        if (props.disabled) return
+    const run = async (action: () => Promise<void>, hapticType: 'success' | 'error'): Promise<boolean> => {
+        if (props.disabled) return false
         setError(null)
         try {
             await action()
+            setResolved(true)
             haptic.notification(hapticType)
             props.onDone()
+            return true
         } catch (e) {
             haptic.notification('error')
             setError(e instanceof Error ? e.message : t('dialog.error.default'))
+            return false
         }
     }
 
