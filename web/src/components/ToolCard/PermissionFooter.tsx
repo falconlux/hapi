@@ -7,8 +7,7 @@ import { Spinner } from '@/components/Spinner'
 import { isCodexFamilyFlavor } from '@/lib/agentFlavorUtils'
 import { getInputStringAny } from '@/lib/toolInputUtils'
 import { useTranslation } from '@/lib/use-translation'
-
-const resolvedPermissions = new Set<string>()
+import { isPermissionResolved, markPermissionResolved } from '@/components/ToolCard/permissionResolution'
 
 function isToolAllowedForSession(toolName: string, toolInput: unknown, allowedTools: string[] | undefined): boolean {
     if (!allowedTools || allowedTools.length === 0) return false
@@ -112,14 +111,14 @@ export function PermissionFooter(props: {
     if (!permission) return null
 
     const summary = formatPermissionSummary(permission, props.tool.name, props.tool.input, codex, t)
-    const isPending = permission.status === 'pending' && !resolvedPermissions.has(permission.id)
+    const isPending = permission.status === 'pending' && !isPermissionResolved(permission.id)
 
     const run = async (action: () => Promise<void>, hapticType: 'success' | 'error'): Promise<boolean> => {
         if (props.disabled) return false
         setError(null)
         try {
             await action()
-            resolvedPermissions.add(permission.id)
+            markPermissionResolved(permission.id)
             haptic.notification(hapticType)
             props.onDone()
             return true

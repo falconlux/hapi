@@ -15,8 +15,7 @@ import { cn } from '@/lib/utils'
 import { usePlatform } from '@/hooks/usePlatform'
 import { Spinner } from '@/components/Spinner'
 import { useTranslation } from '@/lib/use-translation'
-
-const resolvedPermissions = new Set<string>()
+import { isPermissionResolved, markPermissionResolved } from '@/components/ToolCard/permissionResolution'
 
 const questionNavButtonClassName = 'h-8 rounded-full border-[var(--app-border)] bg-[var(--app-tool-card-bg)] px-3.5 text-[var(--app-fg)] hover:border-[var(--app-md-quote-border)] hover:bg-[var(--app-subtle-bg)]'
 
@@ -106,7 +105,7 @@ export function AskUserQuestionFooter(props: {
         setError(null)
     }, [props.tool.id])
 
-    if (!permission || permission.status !== 'pending' || resolvedPermissions.has(permission.id)) return null
+    if (!permission || permission.status !== 'pending' || isPermissionResolved(permission.id)) return null
     if (!isAskUserQuestionToolName(props.tool.name)) return null
 
     const run = async (action: () => Promise<void>, hapticType: 'success' | 'error'): Promise<boolean> => {
@@ -114,7 +113,7 @@ export function AskUserQuestionFooter(props: {
         setError(null)
         try {
             await action()
-            resolvedPermissions.add(permission.id)
+            markPermissionResolved(permission.id)
             haptic.notification(hapticType)
             props.onDone()
             return true

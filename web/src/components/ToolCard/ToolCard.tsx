@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/use-translation'
 import { TraceSection } from '@/components/ToolCard/trace'
 import { isSubagentToolName } from '@/chat/subagentTool'
+import { usePermissionResolved } from '@/components/ToolCard/permissionResolution'
 
 const ELAPSED_INTERVAL_MS = 1000
 
@@ -294,17 +295,21 @@ function ToolCardInner(props: ToolCardProps) {
     const FullToolView = getToolFullViewComponent(toolName)
     const ResultToolView = getToolResultViewComponent(toolName)
     const permission = props.block.tool.permission
+    const isResolvedLocally = usePermissionResolved(permission?.id)
     const isAskUserQuestion = isAskUserQuestionToolName(toolName)
     const isRequestUserInput = isRequestUserInputToolName(toolName)
     const isQuestionTool = isAskUserQuestion || isRequestUserInput
     const isCodexAgentCard = toolName === 'CodexAgent'
+    const { suppressFocusRing, onTriggerPointerDown, onTriggerKeyDown, onTriggerBlur } = usePointerFocusRing()
+
+    if (permission && !isRequestUserInput && (isResolvedLocally || permission.status !== 'pending')) return null
+
     const showsPermissionFooter = Boolean(permission && (
         permission.status === 'pending'
         || ((permission.status === 'denied' || permission.status === 'canceled') && Boolean(permission.reason))
     ))
     const hasBody = showInline || taskSummary !== null || showsPermissionFooter
     const stateColor = statusColorClass(props.block.tool.state)
-    const { suppressFocusRing, onTriggerPointerDown, onTriggerKeyDown, onTriggerBlur } = usePointerFocusRing()
 
     const header = (
         <div className="flex items-center justify-between gap-3">
