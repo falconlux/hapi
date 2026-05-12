@@ -16,6 +16,8 @@ import { usePlatform } from '@/hooks/usePlatform'
 import { Spinner } from '@/components/Spinner'
 import { useTranslation } from '@/lib/use-translation'
 
+const resolvedPermissions = new Set<string>()
+
 const questionNavButtonClassName = 'h-8 rounded-full border-[var(--app-border)] bg-[var(--app-tool-card-bg)] px-3.5 text-[var(--app-fg)] hover:border-[var(--app-md-quote-border)] hover:bg-[var(--app-subtle-bg)]'
 
 function OptionRow(props: {
@@ -92,7 +94,6 @@ export function AskUserQuestionFooter(props: {
     const [fallbackText, setFallbackText] = useState('')
 
     const [loading, setLoading] = useState(false)
-    const [resolved, setResolved] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
@@ -102,11 +103,10 @@ export function AskUserQuestionFooter(props: {
         setOtherTextByQuestion(questions.map(() => ''))
         setFallbackText('')
         setLoading(false)
-        setResolved(false)
         setError(null)
     }, [props.tool.id])
 
-    if (!permission || permission.status !== 'pending' || resolved) return null
+    if (!permission || permission.status !== 'pending' || resolvedPermissions.has(permission.id)) return null
     if (!isAskUserQuestionToolName(props.tool.name)) return null
 
     const run = async (action: () => Promise<void>, hapticType: 'success' | 'error'): Promise<boolean> => {
@@ -114,7 +114,7 @@ export function AskUserQuestionFooter(props: {
         setError(null)
         try {
             await action()
-            setResolved(true)
+            resolvedPermissions.add(permission.id)
             haptic.notification(hapticType)
             props.onDone()
             return true

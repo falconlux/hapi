@@ -8,6 +8,8 @@ import { isCodexFamilyFlavor } from '@/lib/agentFlavorUtils'
 import { getInputStringAny } from '@/lib/toolInputUtils'
 import { useTranslation } from '@/lib/use-translation'
 
+const resolvedPermissions = new Set<string>()
+
 function isToolAllowedForSession(toolName: string, toolInput: unknown, allowedTools: string[] | undefined): boolean {
     if (!allowedTools || allowedTools.length === 0) return false
     if (allowedTools.includes(toolName)) return true
@@ -103,7 +105,6 @@ export function PermissionFooter(props: {
     const [loading, setLoading] = useState<'allow' | 'deny' | 'abort' | null>(null)
     const [loadingAllEdits, setLoadingAllEdits] = useState(false)
     const [loadingForSession, setLoadingForSession] = useState(false)
-    const [resolved, setResolved] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     const codex = useMemo(() => isCodexSession(props.metadata, props.tool.name), [props.metadata, props.tool.name])
@@ -111,14 +112,14 @@ export function PermissionFooter(props: {
     if (!permission) return null
 
     const summary = formatPermissionSummary(permission, props.tool.name, props.tool.input, codex, t)
-    const isPending = permission.status === 'pending' && !resolved
+    const isPending = permission.status === 'pending' && !resolvedPermissions.has(permission.id)
 
     const run = async (action: () => Promise<void>, hapticType: 'success' | 'error'): Promise<boolean> => {
         if (props.disabled) return false
         setError(null)
         try {
             await action()
-            setResolved(true)
+            resolvedPermissions.add(permission.id)
             haptic.notification(hapticType)
             props.onDone()
             return true
