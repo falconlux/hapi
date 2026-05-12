@@ -66,6 +66,7 @@ export type Machine = {
         host: string
         platform: string
         happyCliVersion: string
+        cwd?: string
         displayName?: string
         workspaceRoots?: string[]
     } | null

@@ -8,6 +8,7 @@ const machineMetadataSchema = z.object({
     platform: z.string().optional(),
     happyCliVersion: z.string().optional(),
     displayName: z.string().optional(),
+    cwd: z.string().optional(),
     homeDir: z.string().optional(),
     happyHomeDir: z.string().optional(),
     happyLibDir: z.string().optional(),
@@ -28,6 +29,7 @@ export interface Machine {
         platform: string
         happyCliVersion: string
         displayName?: string
+        cwd?: string
         homeDir?: string
         happyHomeDir?: string
         happyLibDir?: string
@@ -101,6 +103,7 @@ export class MachineCache {
             const platform = typeof data.platform === 'string' ? data.platform : 'unknown'
             const happyCliVersion = typeof data.happyCliVersion === 'string' ? data.happyCliVersion : 'unknown'
             const displayName = typeof data.displayName === 'string' ? data.displayName : undefined
+            const cwd = typeof data.cwd === 'string' ? data.cwd : undefined
             const homeDir = typeof data.homeDir === 'string' ? data.homeDir : undefined
             const happyHomeDir = typeof data.happyHomeDir === 'string' ? data.happyHomeDir : undefined
             const happyLibDir = typeof data.happyLibDir === 'string' ? data.happyLibDir : undefined
@@ -116,6 +119,7 @@ export class MachineCache {
                 platform,
                 happyCliVersion,
                 displayName,
+                cwd,
                 homeDir,
                 happyHomeDir,
                 happyLibDir,

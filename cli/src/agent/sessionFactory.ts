@@ -43,6 +43,7 @@ export function buildMachineMetadata(options?: { workspaceRoots?: string[] }): M
         host: process.env.HAPI_HOSTNAME || os.hostname(),
         platform: os.platform(),
         happyCliVersion: packageJson.version,
+        cwd: getInvokedCwd(),
         homeDir: os.homedir(),
         happyHomeDir: configuration.happyHomeDir,
         happyLibDir: runtimePath(),
