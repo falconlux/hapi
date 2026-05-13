@@ -235,6 +235,7 @@ export function HappyComposer(props: {
     const [showContinueHint, setShowContinueHint] = useState(false)
 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const prevControlledByUser = useRef(controlledByUser)
 
     useComposerDraft(sessionId, composerText, (text) => api.composer().setText(text))
@@ -516,6 +517,26 @@ export function HappyComposer(props: {
             }
         } catch (error) {
             console.error('Error adding pasted image:', error)
+        }
+    }, [api])
+
+    const handleAddAttachment = useCallback(() => {
+        if (controlsDisabled) return
+        fileInputRef.current?.click()
+        haptic('light')
+    }, [controlsDisabled, haptic])
+
+    const handleAttachmentInputChange = useCallback(async (e: ReactChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files ?? [])
+        e.target.value = ''
+        if (files.length === 0) return
+
+        try {
+            for (const file of files) {
+                await api.composer().addAttachment(file)
+            }
+        } catch (error) {
+            console.error('Error adding selected file:', error)
         }
     }, [api])
 
@@ -900,6 +921,16 @@ export function HappyComposer(props: {
                     />
 
                     <div className="overflow-hidden rounded-[20px] bg-[var(--app-secondary-bg)]">
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="*/*"
+                            multiple
+                            className="hidden"
+                            tabIndex={-1}
+                            onChange={handleAttachmentInputChange}
+                        />
+
                         {attachments.length > 0 ? (
                             <div className="flex flex-wrap gap-2 px-4 pt-3">
                                 <ComposerPrimitive.Attachments components={{ Attachment: AttachmentItem }} />
@@ -943,6 +974,7 @@ export function HappyComposer(props: {
                             voiceEnabled={false}
                             voiceStatus={'disconnected'}
                             onVoiceToggle={() => {}}
+                            onAddAttachment={handleAddAttachment}
 
                             onSend={handleSend}
                         />

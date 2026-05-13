@@ -1,4 +1,3 @@
-import { ComposerPrimitive } from '@assistant-ui/react'
 import type { ConversationStatus } from '@/realtime/types'
 import { useTranslation } from '@/lib/use-translation'
 
@@ -318,6 +317,7 @@ export function ComposerButtons(props: {
     voiceMicMuted?: boolean
     onVoiceToggle: () => void
     onVoiceMicToggle?: () => void
+    onAddAttachment: () => void
     onSend: () => void
 }) {
     const { t } = useTranslation()
@@ -326,14 +326,16 @@ export function ComposerButtons(props: {
     return (
         <div className="flex items-center justify-between px-2 pb-2">
             <div className="flex items-center gap-1">
-                <ComposerPrimitive.AddAttachment
+                <button
+                    type="button"
                     aria-label={t('composer.attach')}
                     title={t('composer.attach')}
                     disabled={props.controlsDisabled}
+                    onClick={props.onAddAttachment}
                     className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--app-fg)]/60 transition-colors hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     <AttachmentIcon />
-                </ComposerPrimitive.AddAttachment>
+                </button>
 
                 {props.showSettingsButton ? (
                     <button
