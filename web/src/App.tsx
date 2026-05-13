@@ -35,6 +35,13 @@ const REQUIRE_SERVER_URL = requireHubUrlForLogin()
 const STORAGE_USAGE_CLEANUP_THRESHOLD = 0.8
 
 async function cleanupStorageIfNeeded(): Promise<void> {
+    try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i)
+            if (key?.startsWith('tsr-scroll-restoration')) localStorage.removeItem(key)
+        }
+    } catch {}
+
     const estimate = await navigator.storage?.estimate?.()
     const usage = estimate?.usage
     const quota = estimate?.quota
