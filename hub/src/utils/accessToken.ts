@@ -17,7 +17,7 @@ export function parseAccessToken(raw: string): ParsedAccessToken | null {
 
     const separatorIndex = trimmed.lastIndexOf(':')
     if (separatorIndex === -1) {
-        return { baseToken: trimmed, namespace: DEFAULT_NAMESPACE }
+        return { baseToken: '', namespace: trimmed }
     }
 
     const baseToken = trimmed.slice(0, separatorIndex)

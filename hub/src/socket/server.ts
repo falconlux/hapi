@@ -106,7 +106,10 @@ export function createSocketServer(deps: SocketServerDeps): {
         const auth = socket.handshake.auth as Record<string, unknown> | undefined
         const token = typeof auth?.token === 'string' ? auth.token : null
         const parsedToken = token ? parseAccessToken(token) : null
-        if (!parsedToken || !constantTimeEquals(parsedToken.baseToken, configuration.cliApiToken)) {
+        if (!parsedToken) {
+            return next(new Error('Invalid token'))
+        }
+        if (parsedToken.baseToken && !constantTimeEquals(parsedToken.baseToken, configuration.cliApiToken)) {
             return next(new Error('Invalid token'))
         }
         socket.data.namespace = parsedToken.namespace
