@@ -924,7 +924,6 @@ export function HappyComposer(props: {
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept="*/*"
                             multiple
                             className="hidden"
                             tabIndex={-1}
