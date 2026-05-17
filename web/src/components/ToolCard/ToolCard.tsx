@@ -302,6 +302,7 @@ function ToolCardInner(props: ToolCardProps) {
     const isCodexAgentCard = toolName === 'CodexAgent'
     const { suppressFocusRing, onTriggerPointerDown, onTriggerKeyDown, onTriggerBlur } = usePointerFocusRing()
 
+    if (isAskUserQuestion && (props.block.tool.state === 'completed' || props.block.tool.result !== undefined)) return null
     if (permission && !isRequestUserInput && (isResolvedLocally || permission.status !== 'pending')) return null
 
     const showsPermissionFooter = Boolean(permission && (

@@ -82,7 +82,8 @@ export function ensureToolBlock(
         }
         if (seed.permission) {
             existing.tool.permission = { ...existing.tool.permission, ...seed.permission }
-            if (existing.tool.state === 'running' && seed.permission.status === 'pending') {
+            const hasResult = existing.tool.result !== undefined || existing.tool.completedAt !== null
+            if (!hasResult && existing.tool.state === 'running' && seed.permission.status === 'pending') {
                 existing.tool.state = 'pending'
             }
         }
