@@ -4,7 +4,8 @@ import type { SessionSummary } from '@/types/api'
 export function useDirectorySuggestions(
     machineId: string | null,
     sessions: SessionSummary[],
-    recentPaths: string[]
+    recentPaths: string[],
+    machineCwd?: string | null
 ): string[] {
     return useMemo(() => {
         const machineSessions = machineId
@@ -26,6 +27,9 @@ export function useDirectorySuggestions(
             .filter((path) => !recentSet.has(path))
             .sort((a, b) => a.localeCompare(b))
 
-        return [...dedupedRecent, ...otherPaths]
-    }, [machineId, sessions, recentPaths])
+        const paths = [...dedupedRecent, ...otherPaths]
+        return machineCwd && !paths.includes(machineCwd)
+            ? [machineCwd, ...paths]
+            : paths
+    }, [machineId, sessions, recentPaths, machineCwd])
 }

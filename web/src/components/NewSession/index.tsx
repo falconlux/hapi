@@ -63,6 +63,7 @@ export function NewSession(props: {
     const [worktreeName, setWorktreeName] = useState('')
     const [directoryCreationConfirmed, setDirectoryCreationConfirmed] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const appliedMachineCwdDefaultRef = useRef(false)
     const worktreeInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
@@ -95,10 +96,13 @@ export function NewSession(props: {
             setMachineId(foundLast.id)
             if (!props.initialDirectory) {
                 const paths = getRecentPaths(foundLast.id)
-                if (paths[0]) setDirectory(paths[0])
+                setDirectory(paths[0] ?? foundLast.metadata?.cwd ?? '')
             }
         } else if (props.machines[0]) {
             setMachineId(props.machines[0].id)
+            if (!props.initialDirectory) {
+                setDirectory(props.machines[0].metadata?.cwd ?? '')
+            }
         }
     }, [props.machines, machineId, getLastUsedMachineId, getRecentPaths, props.initialDirectory])
 
@@ -106,6 +110,7 @@ export function NewSession(props: {
         () => (machineId ? props.machines.find((machine) => machine.id === machineId) ?? null : null),
         [machineId, props.machines]
     )
+    const machineCwd = selectedMachine?.metadata?.cwd ?? null
     const codexModelsState = useCodexModels({
         api: props.api,
         machineId,
@@ -137,7 +142,16 @@ export function NewSession(props: {
 
     const trimmedDirectory = directory.trim()
     const deferredDirectory = useDeferredValue(trimmedDirectory)
-    const allPaths = useDirectorySuggestions(machineId, sessions, recentPaths)
+    const allPaths = useDirectorySuggestions(machineId, sessions, recentPaths, machineCwd)
+
+    useEffect(() => {
+        if (props.initialDirectory) return
+        if (appliedMachineCwdDefaultRef.current) return
+        if (directory !== '' || !machineCwd || recentPaths.length > 0) return
+
+        appliedMachineCwdDefaultRef.current = true
+        setDirectory(machineCwd)
+    }, [props.initialDirectory, directory, machineCwd, recentPaths.length])
 
     const pathsToCheck = useMemo(
         () => Array.from(new Set([
@@ -235,9 +249,10 @@ export function NewSession(props: {
         if (paths[0]) {
             setDirectory(paths[0])
         } else {
-            setDirectory('')
+            const nextMachine = props.machines.find((machine) => machine.id === newMachineId)
+            setDirectory(nextMachine?.metadata?.cwd ?? '')
         }
-    }, [getRecentPaths])
+    }, [getRecentPaths, props.machines])
 
     const handlePathClick = useCallback((path: string) => {
         setDirectory(path)

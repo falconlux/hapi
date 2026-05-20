@@ -11,6 +11,7 @@ import { ACTIONS } from './callbacks'
 import { createCallbackData, truncate, getSessionName } from './renderer'
 
 const MAX_TOOL_ARGS_LENGTH = 150
+const MAX_QUESTION_TOOL_ARGS_LENGTH = 500
 
 /**
  * Format a compact session notification for permission requests
@@ -126,6 +127,11 @@ function formatToolArgumentsDetailed(tool: string, args: any): string {
                 return `Updating ${count} todo items`
             }
 
+            case 'AskUserQuestion':
+            case 'AskUserQuestionTool': {
+                return formatAskUserQuestionArguments(args)
+            }
+
             default: {
                 // Generic args display for unknown tools
                 const argStr = JSON.stringify(args)
@@ -138,6 +144,50 @@ function formatToolArgumentsDetailed(tool: string, args: any): string {
     } catch {
         return ''
     }
+}
+
+function formatAskUserQuestionArguments(args: unknown): string {
+    if (!args || typeof args !== 'object' || !('questions' in args)) return ''
+
+    const questions = (args as { questions?: unknown }).questions
+    if (!Array.isArray(questions)) return ''
+
+    const blocks = questions
+        .map((question) => {
+            if (!question || typeof question !== 'object') return ''
+
+            const questionData = question as {
+                question?: unknown
+                header?: unknown
+                options?: unknown
+            }
+
+            const questionText = typeof questionData.question === 'string'
+                ? questionData.question.trim()
+                : ''
+            const header = typeof questionData.header === 'string'
+                ? questionData.header.trim()
+                : ''
+            const options = Array.isArray(questionData.options)
+                ? questionData.options
+                    .map((option) => {
+                        if (!option || typeof option !== 'object') return ''
+                        const label = (option as { label?: unknown }).label
+                        return typeof label === 'string' ? label.trim() : ''
+                    })
+                    .filter(Boolean)
+                : []
+
+            const lines: string[] = []
+            if (questionText) lines.push(`❓ ${questionText}`)
+            if (header) lines.push(`${header}:`)
+            lines.push(...options.map((label) => `• ${label}`))
+
+            return lines.join('\n')
+        })
+        .filter(Boolean)
+
+    return truncate(blocks.join('\n\n'), MAX_QUESTION_TOOL_ARGS_LENGTH)
 }
 
 function buildMiniAppDeepLink(baseUrl: string, startParam: string): string {

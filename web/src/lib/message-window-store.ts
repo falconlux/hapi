@@ -122,6 +122,24 @@ function isSessionStorageAvailable(): boolean {
     }
 }
 
+function isQuotaExceededError(error: unknown): boolean {
+    return error instanceof DOMException
+        && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+}
+
+function setSessionStorageItem(key: string, value: string): void {
+    try {
+        sessionStorage.setItem(key, value)
+    } catch (error) {
+        if (!isQuotaExceededError(error)) {
+            throw error
+        }
+        console.warn('sessionStorage quota exceeded; clearing sessionStorage and retrying write')
+        sessionStorage.clear()
+        sessionStorage.setItem(key, value)
+    }
+}
+
 function toNullableNumber(value: unknown): number | null {
     return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
@@ -155,7 +173,7 @@ function persistState(sessionId: string, state: InternalState): void {
             warning: state.warning,
             atBottom: state.atBottom,
         }
-        sessionStorage.setItem(getStorageKey(sessionId), JSON.stringify(persisted))
+        setSessionStorageItem(getStorageKey(sessionId), JSON.stringify(persisted))
     } catch {
     }
 }

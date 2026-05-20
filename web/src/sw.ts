@@ -38,8 +38,8 @@ registerRoute(
         networkTimeoutSeconds: 10,
         plugins: [
             new ExpirationPlugin({
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 5
+                maxEntries: 50,
+                maxAgeSeconds: 3600
             })
         ]
     })
@@ -52,8 +52,8 @@ registerRoute(
         networkTimeoutSeconds: 10,
         plugins: [
             new ExpirationPlugin({
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 5
+                maxEntries: 50,
+                maxAgeSeconds: 3600
             })
         ]
     })
@@ -66,8 +66,8 @@ registerRoute(
         networkTimeoutSeconds: 10,
         plugins: [
             new ExpirationPlugin({
-                maxEntries: 5,
-                maxAgeSeconds: 60 * 10
+                maxEntries: 50,
+                maxAgeSeconds: 3600
             })
         ]
     })
@@ -79,7 +79,7 @@ registerRoute(
         cacheName: 'cdn-socketio',
         plugins: [
             new ExpirationPlugin({
-                maxEntries: 5,
+                maxEntries: 20,
                 maxAgeSeconds: 60 * 60 * 24 * 30
             })
         ]
@@ -92,7 +92,7 @@ registerRoute(
         cacheName: 'cdn-telegram',
         plugins: [
             new ExpirationPlugin({
-                maxEntries: 5,
+                maxEntries: 20,
                 maxAgeSeconds: 60 * 60 * 24 * 7
             })
         ]

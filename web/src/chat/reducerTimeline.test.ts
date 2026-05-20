@@ -1019,6 +1019,67 @@ describe('reduceTimeline', () => {
         })
     })
 
+    it('keeps a result-bearing AskUserQuestion completed when permission remains pending', () => {
+        const callId = 'ask-1'
+        const messages: TracedMessage[] = [
+            {
+                id: 'ask-call',
+                localId: null,
+                createdAt: 1_700_000_000_000,
+                invokedAt: 1_700_000_000_000,
+                role: 'agent',
+                content: [
+                    {
+                        type: 'tool-call',
+                        id: callId,
+                        name: 'AskUserQuestion',
+                        input: { questions: [{ header: 'Choice', question: 'Proceed?', options: [{ label: 'Yes' }] }] },
+                        description: null,
+                        uuid: 'ask-call-uuid',
+                        parentUUID: null
+                    }
+                ],
+                isSidechain: false
+            } as TracedMessage,
+            {
+                id: 'ask-result',
+                localId: null,
+                createdAt: 1_700_000_001_000,
+                invokedAt: 1_700_000_001_000,
+                role: 'agent',
+                content: [
+                    {
+                        type: 'tool-result',
+                        tool_use_id: callId,
+                        content: { Choice: ['Yes'] },
+                        is_error: false,
+                        uuid: 'ask-result-uuid',
+                        parentUUID: 'ask-call-uuid'
+                    }
+                ],
+                isSidechain: false
+            } as TracedMessage
+        ]
+
+        const context = makeContext()
+        context.permissionsById.set(callId, {
+            toolName: 'AskUserQuestion',
+            input: { questions: [{ header: 'Choice', question: 'Proceed?', options: [{ label: 'Yes' }] }] },
+            permission: {
+                id: callId,
+                status: 'pending',
+                createdAt: 1_700_000_000_000
+            }
+        })
+
+        const { blocks } = reduceTimeline(messages, context)
+        const block = blocks[0] as any
+
+        expect(block.tool.state).toBe('completed')
+        expect(block.tool.result).toEqual({ Choice: ['Yes'] })
+        expect(block.tool.permission.status).toBe('pending')
+    })
+
     it('keeps Codex agent elapsed time stable when the start event fell out of the visible window', () => {
         const messages: TracedMessage[] = [
             {

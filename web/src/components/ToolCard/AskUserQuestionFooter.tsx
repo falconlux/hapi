@@ -15,8 +15,11 @@ import { cn } from '@/lib/utils'
 import { usePlatform } from '@/hooks/usePlatform'
 import { Spinner } from '@/components/Spinner'
 import { useTranslation } from '@/lib/use-translation'
+import { isPermissionResolved, markPermissionResolved } from '@/components/ToolCard/permissionResolution'
 
 const questionNavButtonClassName = 'h-8 rounded-full border-[var(--app-border)] bg-[var(--app-tool-card-bg)] px-3.5 text-[var(--app-fg)] hover:border-[var(--app-md-quote-border)] hover:bg-[var(--app-subtle-bg)]'
+
+type AnswersFormat = Record<string, string[]> | Record<string, { answers: string[] }>
 
 function OptionRow(props: {
     checked: boolean
@@ -72,6 +75,39 @@ function computeAnswersForQuestion(
     return answers
 }
 
+function normalizeAnswers(answers: AnswersFormat | undefined): Record<string, string[]> {
+    if (!answers) return {}
+    const result: Record<string, string[]> = {}
+    for (const [key, value] of Object.entries(answers)) {
+        if (Array.isArray(value)) {
+            result[key] = value
+        } else if (value && typeof value === 'object' && 'answers' in value && Array.isArray(value.answers)) {
+            result[key] = value.answers
+        }
+    }
+    return result
+}
+
+function formatAnsweredSummary(
+    questions: AskUserQuestionQuestion[],
+    answers: AnswersFormat | undefined
+): string {
+    const normalized = normalizeAnswers(answers)
+    const firstEntry = Object.entries(normalized)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .find(([, value]) => value.some((answer) => answer.trim().length > 0))
+
+    if (!firstEntry) return '✅ 已回答'
+
+    const [key, value] = firstEntry
+    const question = questions[Number(key)]
+    const header = question?.header?.trim()
+    const answer = value.map((item) => item.trim()).filter(Boolean).join(', ')
+
+    if (!header) return `✅ ${answer}`
+    return `✅ ${header}: ${answer}`
+}
+
 export function AskUserQuestionFooter(props: {
     api: ApiClient
     sessionId: string
@@ -104,19 +140,35 @@ export function AskUserQuestionFooter(props: {
         setError(null)
     }, [props.tool.id])
 
-    if (!permission || permission.status !== 'pending') return null
     if (!isAskUserQuestionToolName(props.tool.name)) return null
+    if (!permission) return null
 
-    const run = async (action: () => Promise<void>, hapticType: 'success' | 'error') => {
-        if (props.disabled) return
+    const isResolvedLocally = isPermissionResolved(permission.id)
+    const isAnswered = permission.status !== 'pending'
+        || isResolvedLocally
+        || props.tool.state === 'completed'
+
+    if (isAnswered) {
+        return (
+            <div className="mt-2 text-xs font-medium text-[var(--app-badge-success-text)]">
+                {formatAnsweredSummary(questions, permission.answers)}
+            </div>
+        )
+    }
+
+    const run = async (action: () => Promise<void>, hapticType: 'success' | 'error'): Promise<boolean> => {
+        if (props.disabled) return false
         setError(null)
         try {
             await action()
+            markPermissionResolved(permission.id)
             haptic.notification(hapticType)
             props.onDone()
+            return true
         } catch (e) {
             haptic.notification('error')
             setError(e instanceof Error ? e.message : t('dialog.error.default'))
+            return false
         }
     }
 

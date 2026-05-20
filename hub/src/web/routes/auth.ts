@@ -52,7 +52,10 @@ export function createAuthRoutes(jwtSecret: Uint8Array, store: Store): Hono<WebA
         // Access Token authentication (CLI_API_TOKEN)
         if ('accessToken' in parsed.data) {
             const parsedToken = parseAccessToken(parsed.data.accessToken)
-            if (!parsedToken || !constantTimeEquals(parsedToken.baseToken, configuration.cliApiToken)) {
+            if (!parsedToken) {
+                return c.json({ error: 'Invalid access token' }, 401)
+            }
+            if (parsedToken.baseToken && !constantTimeEquals(parsedToken.baseToken, configuration.cliApiToken)) {
                 return c.json({ error: 'Invalid access token' }, 401)
             }
             namespace = parsedToken.namespace

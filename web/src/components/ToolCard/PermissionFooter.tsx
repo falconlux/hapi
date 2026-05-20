@@ -7,6 +7,7 @@ import { Spinner } from '@/components/Spinner'
 import { isCodexFamilyFlavor } from '@/lib/agentFlavorUtils'
 import { getInputStringAny } from '@/lib/toolInputUtils'
 import { useTranslation } from '@/lib/use-translation'
+import { isPermissionResolved, markPermissionResolved } from '@/components/ToolCard/permissionResolution'
 
 function isToolAllowedForSession(toolName: string, toolInput: unknown, allowedTools: string[] | undefined): boolean {
     if (!allowedTools || allowedTools.length === 0) return false
@@ -110,18 +111,21 @@ export function PermissionFooter(props: {
     if (!permission) return null
 
     const summary = formatPermissionSummary(permission, props.tool.name, props.tool.input, codex, t)
-    const isPending = permission.status === 'pending'
+    const isPending = permission.status === 'pending' && !isPermissionResolved(permission.id)
 
-    const run = async (action: () => Promise<void>, hapticType: 'success' | 'error') => {
-        if (props.disabled) return
+    const run = async (action: () => Promise<void>, hapticType: 'success' | 'error'): Promise<boolean> => {
+        if (props.disabled) return false
         setError(null)
         try {
             await action()
+            markPermissionResolved(permission.id)
             haptic.notification(hapticType)
             props.onDone()
+            return true
         } catch (e) {
             haptic.notification('error')
             setError(e instanceof Error ? e.message : t('tool.requestFailed'))
+            return false
         }
     }
 
@@ -191,14 +195,22 @@ export function PermissionFooter(props: {
     }
 
     if (!isPending) {
-        // Keep the thread minimal: approval is already reflected by tool state/icon.
-        // Only surface a short message when the permission was denied/canceled and we have a reason.
-        if (permission.status !== 'denied' && permission.status !== 'canceled') return null
-        if (!permission.reason) return null
+        const resolvedLabel = permission.status === 'approved' ? '✅ 已允许' : '❌ 已拒绝'
 
         return (
-            <div className="mt-2 rounded-xl border border-[var(--app-badge-error-border)] bg-[var(--app-badge-error-bg)] px-3 py-2 text-xs text-[var(--app-badge-error-text)]">
-                {permission.reason}
+            <div className="mt-2 flex flex-col gap-2">
+                <div className={`text-xs font-medium ${
+                    permission.status === 'approved'
+                        ? 'text-[var(--app-badge-success-text)]'
+                        : 'text-[var(--app-badge-error-text)]'
+                }`}>
+                    {resolvedLabel}
+                </div>
+                {permission.reason ? (
+                    <div className="rounded-xl border border-[var(--app-badge-error-border)] bg-[var(--app-badge-error-bg)] px-3 py-2 text-xs text-[var(--app-badge-error-text)]">
+                        {permission.reason}
+                    </div>
+                ) : null}
             </div>
         )
     }

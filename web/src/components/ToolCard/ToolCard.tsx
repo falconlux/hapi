@@ -298,13 +298,11 @@ function ToolCardInner(props: ToolCardProps) {
     const isRequestUserInput = isRequestUserInputToolName(toolName)
     const isQuestionTool = isAskUserQuestion || isRequestUserInput
     const isCodexAgentCard = toolName === 'CodexAgent'
-    const showsPermissionFooter = Boolean(permission && (
-        permission.status === 'pending'
-        || ((permission.status === 'denied' || permission.status === 'canceled') && Boolean(permission.reason))
-    ))
+    const { suppressFocusRing, onTriggerPointerDown, onTriggerKeyDown, onTriggerBlur } = usePointerFocusRing()
+
+    const showsPermissionFooter = Boolean(permission)
     const hasBody = showInline || taskSummary !== null || showsPermissionFooter
     const stateColor = statusColorClass(props.block.tool.state)
-    const { suppressFocusRing, onTriggerPointerDown, onTriggerKeyDown, onTriggerBlur } = usePointerFocusRing()
 
     const header = (
         <div className="flex items-center justify-between gap-3">
@@ -426,7 +424,7 @@ function ToolCardInner(props: ToolCardProps) {
                         )
                     ) : null}
 
-                    {isAskUserQuestion && permission?.status === 'pending' ? (
+                    {isAskUserQuestion && permission ? (
                         <AskUserQuestionFooter
                             api={props.api}
                             sessionId={props.sessionId}

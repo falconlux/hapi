@@ -30,7 +30,7 @@ export function createAttachmentAdapter(api: ApiClient, sessionId: string): Atta
     }
 
     return {
-        accept: '*/*',
+        accept: '*',
 
         async *add({ file }): AsyncGenerator<PendingAttachment> {
             const id = randomId()

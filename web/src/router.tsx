@@ -654,7 +654,7 @@ export function createAppRouter(history?: RouterHistory) {
     return createRouter({
         routeTree,
         history,
-        scrollRestoration: true,
+        scrollRestoration: false,
     })
 }
 
