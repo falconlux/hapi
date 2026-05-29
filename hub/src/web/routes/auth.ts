@@ -128,7 +128,7 @@ export function createAuthRoutes(jwtSecret: Uint8Array, store: Store): Hono<WebA
             return c.json({ error: 'Invalid body' }, 400)
         }
         const parsedToken = parseAccessToken(parsed.data.accessToken)
-        if (!parsedToken || !constantTimeEquals(parsedToken.baseToken, configuration.cliApiToken)) {
+        if (!parsedToken || (parsedToken.baseToken && !constantTimeEquals(parsedToken.baseToken, configuration.cliApiToken))) {
             return c.json({ error: 'Invalid access token' }, 401)
         }
         const check = await verifyPassword(parsedToken.namespace, parsed.data.currentPassword)

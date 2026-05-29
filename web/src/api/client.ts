@@ -162,6 +162,19 @@ export class ApiClient {
         return await res.json() as AuthResponse
     }
 
+    async changePassword(params: { accessToken: string; currentPassword: string; newPassword: string }): Promise<{ token: string }> {
+        const res = await fetch(this.buildUrl('/api/auth/change-password'), {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(params)
+        })
+        if (!res.ok) {
+            const body = await res.text().catch(() => '')
+            throw new ApiError(body || `HTTP ${res.status}`, res.status, undefined, body || undefined)
+        }
+        return await res.json() as { token: string }
+    }
+
     async getSessions(): Promise<SessionsResponse> {
         return await this.request<SessionsResponse>('/api/sessions')
     }
