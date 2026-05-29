@@ -4,7 +4,9 @@ export const CLAUDE_MODEL_LABELS = {
     'claude-opus-4-6': 'Opus 4.6',
     'claude-opus-4-6[1m]': 'Opus 4.6 1M',
     'claude-opus-4-7': 'Opus 4.7',
-    'claude-opus-4-7[1m]': 'Opus 4.7 1M'
+    'claude-opus-4-7[1m]': 'Opus 4.7 1M',
+    'claude-opus-4-8': 'Opus 4.8',
+    'claude-opus-4-8[1m]': 'Opus 4.8 1M'
 } as const
 
 export type ClaudeModelPreset = keyof typeof CLAUDE_MODEL_LABELS
