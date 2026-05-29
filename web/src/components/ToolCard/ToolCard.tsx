@@ -13,6 +13,7 @@ import { AskUserQuestionFooter } from '@/components/ToolCard/AskUserQuestionFoot
 import { RequestUserInputFooter } from '@/components/ToolCard/RequestUserInputFooter'
 import { isAskUserQuestionToolName } from '@/components/ToolCard/askUserQuestion'
 import { isRequestUserInputToolName } from '@/components/ToolCard/requestUserInput'
+import { isPermissionResolved } from '@/components/ToolCard/permissionResolution'
 import { getToolPresentation } from '@/components/ToolCard/knownTools'
 import { getToolFullViewComponent, getToolViewComponent } from '@/components/ToolCard/views/_all'
 import { getToolResultViewComponent } from '@/components/ToolCard/views/_results'
@@ -299,6 +300,13 @@ function ToolCardInner(props: ToolCardProps) {
     const isQuestionTool = isAskUserQuestion || isRequestUserInput
     const isCodexAgentCard = toolName === 'CodexAgent'
     const { suppressFocusRing, onTriggerPointerDown, onTriggerKeyDown, onTriggerBlur } = usePointerFocusRing()
+
+    if (isQuestionTool && permission) {
+        const isResolved = permission.status !== 'pending'
+            || isPermissionResolved(permission.id)
+            || props.block.tool.state === 'completed'
+        if (isResolved) return null
+    }
 
     const showsPermissionFooter = Boolean(permission)
     const hasBody = showInline || taskSummary !== null || showsPermissionFooter
