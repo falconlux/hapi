@@ -10,6 +10,7 @@ import { DiffView } from '@/components/DiffView'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { PermissionFooter } from '@/components/ToolCard/PermissionFooter'
 import { AskUserQuestionFooter } from '@/components/ToolCard/AskUserQuestionFooter'
+import { isPermissionResolved } from '@/components/ToolCard/permissionResolution'
 import { RequestUserInputFooter } from '@/components/ToolCard/RequestUserInputFooter'
 import { isAskUserQuestionToolName } from '@/components/ToolCard/askUserQuestion'
 import { isRequestUserInputToolName } from '@/components/ToolCard/requestUserInput'
@@ -299,6 +300,16 @@ function ToolCardInner(props: ToolCardProps) {
     const isQuestionTool = isAskUserQuestion || isRequestUserInput
     const isCodexAgentCard = toolName === 'CodexAgent'
     const { suppressFocusRing, onTriggerPointerDown, onTriggerKeyDown, onTriggerBlur } = usePointerFocusRing()
+
+    if (isQuestionTool && permission) {
+        const answeredThisSession = isPermissionResolved(permission.id)
+        const answeredOnServer = permission.status !== 'pending'
+            || props.block.tool.state === 'completed'
+        // Freshly answered questions keep the card so the compact summary confirms
+        // the choice. Questions answered on the server but not during this session
+        // (e.g. restored after a page refresh) are historical noise — hide them.
+        if (answeredOnServer && !answeredThisSession) return null
+    }
 
     const showsPermissionFooter = Boolean(permission)
     const hasBody = showInline || taskSummary !== null || showsPermissionFooter
