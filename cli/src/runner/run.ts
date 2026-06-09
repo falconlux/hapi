@@ -235,6 +235,9 @@ export async function startRunner(options: { workspaceRoots?: string[] } = {}): 
       logger.debugLargeJson('[RUNNER RUN] Spawning session', options);
 
       const { directory, sessionId, machineId, approvedNewDirectoryCreation = true } = options;
+      if (sessionId && stopSession(sessionId)) {
+        logger.debug(`[RUNNER RUN] Killed stale session ${sessionId} before re-spawn`);
+      }
       const agent = options.agent ?? 'claude';
       const yolo = options.yolo === true;
       const sessionType = options.sessionType ?? 'simple';
