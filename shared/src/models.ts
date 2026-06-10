@@ -1,4 +1,6 @@
 export const CLAUDE_MODEL_LABELS = {
+    'claude-fable-5': 'Fable 5',
+    'claude-fable-5[1m]': 'Fable 5 1M',
     sonnet: 'Sonnet',
     'sonnet[1m]': 'Sonnet 1M',
     'claude-opus-4-6': 'Opus 4.6',
