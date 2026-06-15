@@ -3,6 +3,21 @@ import type { Server } from 'socket.io'
 import { randomUUID } from 'node:crypto'
 import type { Store, CancelQueuedMessageResult } from '../store'
 import { EventPublisher } from './eventPublisher'
+import { getSystemPromptOverride } from './systemPromptOverride'
+
+type UserMessageMeta = {
+    sentFrom: 'telegram-bot' | 'webapp'
+    customSystemPrompt?: string
+}
+
+function getSessionFlavor(metadata: unknown | null): string | null {
+    if (!metadata || typeof metadata !== 'object' || !('flavor' in metadata)) {
+        return null
+    }
+
+    const flavor = metadata.flavor
+    return typeof flavor === 'string' ? flavor : null
+}
 
 export class MessageService {
     constructor(
@@ -325,6 +340,16 @@ export class MessageService {
         }
     ): Promise<void> {
         const sentFrom = payload.sentFrom ?? 'webapp'
+        const flavor = getSessionFlavor(this.store.sessions.getSession(sessionId)?.metadata ?? null)
+        const systemPromptOverride = flavor === null || flavor === 'claude'
+            ? getSystemPromptOverride()
+            : null
+        const meta: UserMessageMeta = {
+            sentFrom
+        }
+        if (systemPromptOverride !== null) {
+            meta.customSystemPrompt = systemPromptOverride
+        }
 
         const content = {
             role: 'user',
@@ -333,9 +358,7 @@ export class MessageService {
                 text: payload.text,
                 attachments: payload.attachments
             },
-            meta: {
-                sentFrom
-            }
+            meta
         }
 
         const msg = this.store.messages.addMessage(sessionId, content, payload.localId ?? undefined)
