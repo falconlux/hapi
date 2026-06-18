@@ -1,8 +1,8 @@
 import { join } from 'path'
-import { tmpdir } from 'os'
+import { configuration } from '@/configuration'
 
-export const HAPI_BLOBS_DIR_NAME = 'hapi-blobs'
+export const HAPI_BLOBS_DIR_NAME = 'blobs'
 
 export function getHapiBlobsDir(): string {
-    return join(tmpdir(), HAPI_BLOBS_DIR_NAME)
+    return join(configuration.happyHomeDir, HAPI_BLOBS_DIR_NAME)
 }

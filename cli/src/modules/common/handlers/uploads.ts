@@ -1,7 +1,6 @@
 import { logger } from '@/ui/logger'
-import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises'
+import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from 'fs/promises'
 import { join, resolve, sep } from 'path'
-import { rmSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import type { RpcHandlerManager } from '@/api/rpc/RpcHandlerManager'
 import { getErrorMessage, rpcError } from '../rpcResponses'
@@ -36,6 +35,7 @@ const uploadDirCleanupRequested = new Set<string>()
 let cleanupRegistered = false
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 const MAX_IMAGE_DIMENSION = 2000
+const BLOB_TTL_MS = 24 * 60 * 60 * 1000
 
 const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/tiff', 'image/bmp'])
 
@@ -157,17 +157,24 @@ export async function cleanupUploadDir(sessionId?: string): Promise<void> {
     }
 }
 
-function cleanupUploadDirsSync(): void {
-    const dirs = Array.from(uploadDirs.values())
-    uploadDirs.clear()
-    uploadDirPromises.clear()
-    uploadDirCleanupRequested.clear()
-
-    for (const dir of dirs) {
+async function cleanupStaleBlobs(): Promise<void> {
+    const blobsDir = getHapiBlobsDir()
+    let entries
+    try {
+        entries = await readdir(blobsDir, { withFileTypes: true })
+    } catch {
+        return
+    }
+    const now = Date.now()
+    for (const entry of entries) {
+        const full = join(blobsDir, entry.name)
         try {
-            rmSync(dir, { recursive: true, force: true })
+            const info = await stat(full)
+            if (now - info.mtimeMs > BLOB_TTL_MS) {
+                await rm(full, { recursive: true, force: true })
+            }
         } catch (error) {
-            logger.debug('Failed to cleanup upload directory on exit:', error)
+            logger.debug('Failed to cleanup stale blob:', error)
         }
     }
 }
@@ -190,7 +197,9 @@ function isPathWithinUploadDir(path: string, sessionId?: string): boolean {
 export function registerUploadHandlers(rpcHandlerManager: RpcHandlerManager): void {
     if (!cleanupRegistered) {
         cleanupRegistered = true
-        process.once('exit', cleanupUploadDirsSync)
+        void cleanupStaleBlobs()
+        const timer = setInterval(() => void cleanupStaleBlobs(), 6 * 60 * 60 * 1000)
+        timer.unref?.()
     }
 
     rpcHandlerManager.registerHandler<UploadFileRequest, UploadFileResponse>('uploadFile', async (data) => {
