@@ -11,6 +11,7 @@ import { systemPrompt } from "./utils/systemPrompt";
 import { PermissionResult } from "./sdk/types";
 import { getHapiBlobsDir } from "@/constants/uploadPaths";
 import { getDefaultClaudeCodePath } from "./sdk/utils";
+import { applyClaudeConnection } from './utils/claudeConnection'
 
 export async function claudeRemote(opts: {
 
@@ -79,6 +80,7 @@ export async function claudeRemote(opts: {
         });
     }
     process.env.DISABLE_AUTOUPDATER = '1';
+    applyClaudeConnection();
 
     // Get initial message
     let initial;
