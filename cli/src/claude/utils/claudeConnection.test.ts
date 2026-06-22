@@ -57,4 +57,26 @@ describe('applyClaudeConnection', () => {
         expect(process.env.ANTHROPIC_BASE_URL).toBeUndefined()
         expect(process.env.ANTHROPIC_AUTH_TOKEN).toBeUndefined()
     })
+
+    it('falls back to OAuth when the connection file is not valid JSON', () => {
+        process.env.ANTHROPIC_BASE_URL = 'https://code-cli.cn'
+        process.env.ANTHROPIC_AUTH_TOKEN = 'sk-test'
+        writeFileSync(connectionPath, 'not-json{')
+
+        applyClaudeConnection()
+
+        expect(process.env.ANTHROPIC_BASE_URL).toBeUndefined()
+        expect(process.env.ANTHROPIC_AUTH_TOKEN).toBeUndefined()
+    })
+
+    it('falls back to OAuth when a newapi connection is missing url/key', () => {
+        process.env.ANTHROPIC_BASE_URL = 'https://code-cli.cn'
+        process.env.ANTHROPIC_AUTH_TOKEN = 'sk-test'
+        writeFileSync(connectionPath, JSON.stringify({ _type: 'newapi_channel_conn', url: 'https://code-cli.cn' }))
+
+        applyClaudeConnection()
+
+        expect(process.env.ANTHROPIC_BASE_URL).toBeUndefined()
+        expect(process.env.ANTHROPIC_AUTH_TOKEN).toBeUndefined()
+    })
 })
