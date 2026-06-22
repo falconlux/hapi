@@ -12,6 +12,7 @@ import { PermissionResult } from "./sdk/types";
 import { getHapiBlobsDir } from "@/constants/uploadPaths";
 import { getDefaultClaudeCodePath } from "./sdk/utils";
 import { filterCatalogAffectingClaudeArgs } from "./sdk/metadataExtractor";
+import { applyClaudeConnection } from './utils/claudeConnection'
 
 export async function claudeRemote(opts: {
 
@@ -82,6 +83,7 @@ export async function claudeRemote(opts: {
         });
     }
     process.env.DISABLE_AUTOUPDATER = '1';
+    applyClaudeConnection();
 
     // Message-level Fork current passes `--fork-session` via claudeArgs from the runner.
     const forkSession = Boolean(opts.claudeArgs?.includes('--fork-session'));
