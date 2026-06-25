@@ -12,6 +12,7 @@ import { PLAN_FAKE_REJECT } from "./sdk/prompts";
 import { EnhancedMode } from "./loop";
 import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 import type { ClaudePermissionMode } from "@hapi/protocol/types";
+import { currentConnectionFingerprint } from "./utils/claudeConnection";
 import {
     RemoteLauncherBase,
     type RemoteLauncherDisplayContext,
@@ -351,8 +352,10 @@ class ClaudeRemoteLauncher extends RemoteLauncherBase {
                 this.abortController = controller;
                 this.abortFuture = new Future<void>();
                 let modeHash: string | null = null;
+                let connFingerprint: string | null = null;
                 let mode: EnhancedMode | null = null;
                 try {
+                    connFingerprint = currentConnectionFingerprint();
                     await claudeRemote({
                         sessionId: session.sessionId,
                         path: session.path,
@@ -376,6 +379,11 @@ class ClaudeRemoteLauncher extends RemoteLauncherBase {
                             if (msg) {
                                 if ((modeHash && msg.hash !== modeHash) || msg.isolate) {
                                     logger.debug('[remote]: mode has changed, pending message');
+                                    pending = msg;
+                                    return null;
+                                }
+                                if (connFingerprint !== null && currentConnectionFingerprint() !== connFingerprint) {
+                                    logger.debug('[remote]: connection changed, pending message');
                                     pending = msg;
                                     return null;
                                 }
@@ -467,6 +475,7 @@ class ClaudeRemoteLauncher extends RemoteLauncherBase {
                     permissionHandler.reset();
                     fileUploadTracker.reset();
                     modeHash = null;
+                    connFingerprint = null;
                     mode = null;
                 }
             }
