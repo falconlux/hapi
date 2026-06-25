@@ -29,6 +29,14 @@ function useOAuth(): void {
     restoreEnv('ANTHROPIC_AUTH_TOKEN', ORIGINAL_AUTH_TOKEN)
 }
 
+export function currentConnectionFingerprint(): string {
+    try {
+        return readFileSync(connectionFile(), 'utf-8').trim()
+    } catch {
+        return 'oauth'
+    }
+}
+
 /**
  * Apply the current Claude connection to process.env before a session query.
  * - newapi_channel_conn {url,key} -> route Claude through the gateway.

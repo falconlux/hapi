@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { existsSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { applyClaudeConnection } from './claudeConnection'
+import { applyClaudeConnection, currentConnectionFingerprint } from './claudeConnection'
 
 describe('applyClaudeConnection', () => {
     let connectionPath: string
@@ -78,5 +78,21 @@ describe('applyClaudeConnection', () => {
 
         expect(process.env.ANTHROPIC_BASE_URL).toBeUndefined()
         expect(process.env.ANTHROPIC_AUTH_TOKEN).toBeUndefined()
+    })
+
+    it('returns oauth fingerprint when connection file is missing', () => {
+        expect(currentConnectionFingerprint()).toBe('oauth')
+    })
+
+    it('returns trimmed connection file content as fingerprint', () => {
+        const content = JSON.stringify({
+            _type: 'newapi_channel_conn',
+            url: 'https://code-cli.cn',
+            key: 'sk-test',
+        })
+        writeFileSync(connectionPath, `\n${content}\n`)
+
+        expect(currentConnectionFingerprint()).toBe(content)
+        expect(currentConnectionFingerprint()).not.toBe('oauth')
     })
 })

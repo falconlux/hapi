@@ -13,6 +13,7 @@ import { EnhancedMode } from "./loop";
 import { OutgoingMessageQueue } from "./utils/OutgoingMessageQueue";
 import type { ClaudePermissionMode } from "@hapi/protocol/types";
 import { applySessionTitleFallback } from './utils/sessionTitleFallback';
+import { currentConnectionFingerprint } from "./utils/claudeConnection";
 import {
     RemoteLauncherBase,
     type RemoteLauncherDisplayContext,
@@ -340,6 +341,7 @@ class ClaudeRemoteLauncher extends RemoteLauncherBase {
                 this.abortController = controller;
                 this.abortFuture = new Future<void>();
                 let modeHash: string | null = null;
+                let connFingerprint: string | null = null;
                 let mode: EnhancedMode | null = null;
                 // True once onReady() has fired at least once during this
                 // attempt. Used to distinguish an immediate/deterministic
@@ -380,6 +382,7 @@ class ClaudeRemoteLauncher extends RemoteLauncherBase {
                 // 'never'" (verified against `bun run typecheck`).
                 let inFlightMessage: InFlightMessage | null = null as InFlightMessage | null;
                 try {
+                    connFingerprint = currentConnectionFingerprint();
                     await claudeRemote({
                         sessionId: session.sessionId,
                         path: session.path,
@@ -444,6 +447,11 @@ class ClaudeRemoteLauncher extends RemoteLauncherBase {
                                     // still safely held in `pending`,
                                     // delivering it twice.
                                     logger.debug('[remote]: mode has changed, pending message');
+                                    pending = msg;
+                                    return null;
+                                }
+                                if (connFingerprint !== null && currentConnectionFingerprint() !== connFingerprint) {
+                                    logger.debug('[remote]: connection changed, pending message');
                                     pending = msg;
                                     return null;
                                 }
@@ -634,6 +642,7 @@ class ClaudeRemoteLauncher extends RemoteLauncherBase {
                     logger.debug('[remote]: launch done');
                     permissionHandler.reset();
                     modeHash = null;
+                    connFingerprint = null;
                     mode = null;
                 }
             }
