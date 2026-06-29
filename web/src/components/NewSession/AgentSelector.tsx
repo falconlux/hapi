@@ -1,6 +1,8 @@
 import type { AgentType } from './types'
 import { useTranslation } from '@/lib/use-translation'
 
+const AGENT_LABELS: Partial<Record<AgentType, string>> = { glm: 'GLM' }
+
 export function AgentSelector(props: {
     agent: AgentType
     isDisabled: boolean
@@ -14,7 +16,7 @@ export function AgentSelector(props: {
                 {t('newSession.agent')}
             </label>
             <div className="flex flex-wrap gap-x-3 gap-y-2">
-                {(['claude', 'codex', 'cursor', 'gemini', 'opencode'] as const).map((agentType) => (
+                {(['claude', 'codex', 'cursor', 'gemini', 'glm', 'opencode'] as const).map((agentType) => (
                     <label
                         key={agentType}
                         className="flex items-center gap-1.5 cursor-pointer"
@@ -28,7 +30,7 @@ export function AgentSelector(props: {
                             disabled={props.isDisabled}
                             className="accent-[var(--app-link)]"
                         />
-                        <span className="text-sm capitalize">{agentType}</span>
+                        <span className="text-sm capitalize">{AGENT_LABELS[agentType] ?? agentType}</span>
                     </label>
                 ))}
             </div>
