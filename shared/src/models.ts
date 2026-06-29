@@ -8,7 +8,12 @@ export const CLAUDE_MODEL_LABELS = {
     'claude-opus-4-7': 'Opus 4.7',
     'claude-opus-4-7[1m]': 'Opus 4.7 1M',
     'claude-opus-4-8': 'Opus 4.8',
-    'claude-opus-4-8[1m]': 'Opus 4.8 1M'
+    'claude-opus-4-8[1m]': 'Opus 4.8 1M',
+    // GLM models via newapi gateway (glm_channel_conn)
+    'glm-5.2': 'GLM 5.2',
+    'glm-5': 'GLM 5',
+    'deepseek-r1': 'DeepSeek R1',
+    'qwen-plus': 'Qwen Plus',
 } as const
 
 export type ClaudeModelPreset = keyof typeof CLAUDE_MODEL_LABELS
