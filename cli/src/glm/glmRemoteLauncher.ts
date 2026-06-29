@@ -14,13 +14,15 @@ const GLM_SYSTEM_PROMPT = '你是一位经验丰富的软件工程师，擅长�
 class GlmRemoteLauncher extends RemoteLauncherBase {
     private readonly session: GlmSession
     private readonly initialModel?: string
+    private readonly resumeSessionId?: string
     private abortController = new AbortController()
     private config: GlmRuntimeConfig
 
-    constructor(session: GlmSession, opts: { model?: string }) {
+    constructor(session: GlmSession, opts: { model?: string; resumeSessionId?: string }) {
         super(process.env.DEBUG ? session.logPath : undefined)
         this.session = session
         this.initialModel = opts.model
+        this.resumeSessionId = opts.resumeSessionId
         this.config = resolveGlmConfig({ model: opts.model })
     }
 
@@ -45,7 +47,7 @@ class GlmRemoteLauncher extends RemoteLauncherBase {
             { role: 'system', content: GLM_SYSTEM_PROMPT }
         ]
 
-        const sessionId = randomUUID()
+        const sessionId = this.resumeSessionId ?? randomUUID()
         session.onSessionFound(sessionId)
 
         this.setupAbortHandlers(session.client.rpcHandlerManager, {
@@ -85,6 +87,7 @@ class GlmRemoteLauncher extends RemoteLauncherBase {
                 this.handleAgentMessage({ type: 'turn_complete', stopReason: 'stop' })
                 messageBuffer.addMessage(response, 'assistant')
             } catch (error) {
+                history.pop()
                 if (this.abortController.signal.aborted) {
                     messageBuffer.addMessage('Turn aborted', 'status')
                     this.abortController = new AbortController()
@@ -134,7 +137,9 @@ class GlmRemoteLauncher extends RemoteLauncherBase {
     }
 
     private async readStream(response: Response): Promise<string> {
-        const reader = response.body!.getReader()
+        if (!response.body) throw new Error('GLM API returned empty body')
+
+        const reader = response.body.getReader()
         const decoder = new TextDecoder()
         let fullText = ''
         let buffer = ''
@@ -158,12 +163,33 @@ class GlmRemoteLauncher extends RemoteLauncherBase {
                         const content = chunk.choices[0]?.delta?.content ?? ''
                         if (content) fullText += content
                     } catch {
-                        // ignore malformed SSE lines
+                        logger.debug('[glm] Malformed SSE chunk:', data.slice(0, 100))
+                    }
+                }
+            }
+
+            // Process remaining buffer
+            if (buffer.trim()) {
+                const line = buffer.trim()
+                if (line.startsWith('data: ')) {
+                    const data = line.slice(6).trim()
+                    if (data !== '[DONE]') {
+                        try {
+                            const chunk = JSON.parse(data) as OpenAIStreamChunk
+                            const content = chunk.choices[0]?.delta?.content ?? ''
+                            if (content) fullText += content
+                        } catch {
+                            logger.debug('[glm] Malformed SSE chunk in buffer tail:', data.slice(0, 100))
+                        }
                     }
                 }
             }
         } finally {
             reader.releaseLock()
+        }
+
+        if (!fullText) {
+            throw new Error('GLM API returned empty response (no valid content in stream)')
         }
 
         return fullText
@@ -190,7 +216,7 @@ class GlmRemoteLauncher extends RemoteLauncherBase {
 
 export async function glmRemoteLauncher(
     session: GlmSession,
-    opts: { model?: string }
+    opts: { model?: string; resumeSessionId?: string }
 ): Promise<'switch' | 'exit'> {
     const launcher = new GlmRemoteLauncher(session, opts)
     return launcher.launch()

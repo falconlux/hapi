@@ -10,6 +10,7 @@ import { createModeChangeHandler, createRunnerLifecycle, setControlledByUser } f
 import { formatMessageWithAttachments } from '@/utils/attachmentFormatter'
 import { getInvokedCwd } from '@/utils/invokedCwd'
 import { DEFAULT_GLM_MODEL } from './utils/config'
+import { GLM_MODEL_PRESETS } from '@hapi/protocol'
 
 export async function runGlm(opts: {
     startedBy?: 'runner' | 'terminal'
@@ -79,6 +80,9 @@ export async function runGlm(opts: {
                 sessionModel = null
             } else if (typeof config.model === 'string' && config.model.trim().length > 0) {
                 sessionModel = config.model.trim()
+                if (sessionModel && !GLM_MODEL_PRESETS.includes(sessionModel as any)) {
+                    logger.debug(`[glm] Unknown model "${sessionModel}", proceeding anyway (gateway may support it)`)
+                }
             } else {
                 throw new Error('Invalid model')
             }

@@ -48,7 +48,8 @@ export async function glmLoop(opts: GlmLoopOptions): Promise<void> {
         logTag: 'glm-loop',
         runLocal: async (_instance) => 'exit',
         runRemote: (instance) => glmRemoteLauncher(instance, {
-            model: getCurrentModel()
+            model: getCurrentModel(),
+            resumeSessionId: opts.resumeSessionId
         }),
         onSessionReady: opts.onSessionReady
     })

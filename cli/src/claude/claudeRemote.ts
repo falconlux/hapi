@@ -11,7 +11,7 @@ import { systemPrompt } from "./utils/systemPrompt";
 import { PermissionResult } from "./sdk/types";
 import { getHapiBlobsDir } from "@/constants/uploadPaths";
 import { getDefaultClaudeCodePath } from "./sdk/utils";
-import { applyClaudeConnection, getConnectionModelOverride } from './utils/claudeConnection'
+import { applyClaudeConnection } from './utils/claudeConnection'
 
 export async function claudeRemote(opts: {
 
@@ -130,7 +130,7 @@ export async function claudeRemote(opts: {
         resume: startFrom ?? undefined,
         mcpServers: opts.mcpServers,
         permissionMode: initial.mode.permissionMode,
-        model: initial.mode.model ?? getConnectionModelOverride(),
+        model: initial.mode.model,
         effort: initial.mode.effort,
         fallbackModel: initial.mode.fallbackModel,
         customSystemPrompt: initial.mode.customSystemPrompt ? initial.mode.customSystemPrompt + '\n\n' + systemPrompt : undefined,

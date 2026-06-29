@@ -8,11 +8,8 @@ function connectionFile(): string {
 }
 
 interface NewapiChannelConn { _type: 'newapi_channel_conn'; url: string; key: string }
-// glm_channel_conn: routes through newapi but defaults to a GLM model.
-// model field is optional; if set it becomes the default when no model is chosen in the session.
-interface GlmChannelConn { _type: 'glm_channel_conn'; url: string; key: string; model?: string }
 
-type ChannelConn = NewapiChannelConn | GlmChannelConn
+type ChannelConn = NewapiChannelConn
 
 // Capture the daemon's original Claude-connection env at module load (reflects the
 // launchd/parent env before any session runs). When we fall back to OAuth we RESTORE
@@ -34,16 +31,6 @@ function useOAuth(): void {
     restoreEnv('ANTHROPIC_AUTH_TOKEN', ORIGINAL_AUTH_TOKEN)
 }
 
-function readConn(): Partial<ChannelConn> | null {
-    try {
-        const raw = readFileSync(connectionFile(), 'utf-8')
-        const parsed = JSON.parse(raw)
-        return parsed && typeof parsed === 'object' ? parsed as Partial<ChannelConn> : null
-    } catch {
-        return null
-    }
-}
-
 export function currentConnectionFingerprint(): string {
     try {
         return readFileSync(connectionFile(), 'utf-8').trim()
@@ -53,22 +40,8 @@ export function currentConnectionFingerprint(): string {
 }
 
 /**
- * If the active connection is glm_channel_conn and has a model field, return it.
- * Called by claudeRemote to apply a default model when none is set in the session.
- */
-export function getConnectionModelOverride(): string | undefined {
-    const conn = readConn()
-    if (conn?._type === 'glm_channel_conn' && typeof conn.model === 'string' && conn.model) {
-        return conn.model
-    }
-    return undefined
-}
-
-/**
  * Apply the current Claude connection to process.env before a session query.
  * - newapi_channel_conn {url,key} -> route Claude through the newapi gateway.
- * - glm_channel_conn {url,key,model?} -> same routing but defaults to a GLM model.
- *   newapi.1to10.cn speaks the Anthropic Messages API and proxies to GLM/other models.
  * - file absent -> OAuth (the normal default), silently.
  * - file present but invalid JSON / missing url|key -> OAuth + a WARNING, so a broken
  *   gateway file does not silently keep you on an exhausted OAuth account.
@@ -95,7 +68,7 @@ export function applyClaudeConnection(): void {
         return
     }
 
-    if (conn && (conn._type === 'newapi_channel_conn' || conn._type === 'glm_channel_conn')) {
+    if (conn && conn._type === 'newapi_channel_conn') {
         if (typeof conn.url === 'string' && conn.url && typeof conn.key === 'string' && conn.key) {
             process.env.ANTHROPIC_BASE_URL = conn.url
             process.env.ANTHROPIC_AUTH_TOKEN = conn.key
