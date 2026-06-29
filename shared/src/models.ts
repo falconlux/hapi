@@ -26,6 +26,19 @@ export type GeminiModelPreset = keyof typeof GEMINI_MODEL_LABELS
 export const GEMINI_MODEL_PRESETS = Object.keys(GEMINI_MODEL_LABELS) as GeminiModelPreset[]
 export const DEFAULT_GEMINI_MODEL: GeminiModelPreset = 'gemini-2.5-pro'
 
+export const GLM_MODEL_LABELS = {
+    'glm-5.2': 'GLM 5.2',
+    'glm-5': 'GLM 5',
+    'deepseek-r1': 'DeepSeek R1',
+    'qwen-plus': 'Qwen Plus',
+    'qwen-turbo': 'Qwen Turbo',
+    'grok-4': 'Grok 4',
+} as const
+
+export type GlmModelPreset = keyof typeof GLM_MODEL_LABELS
+export const GLM_MODEL_PRESETS = Object.keys(GLM_MODEL_LABELS) as GlmModelPreset[]
+export const DEFAULT_GLM_MODEL: GlmModelPreset = 'glm-5.2'
+
 export function isClaudeModelPreset(model: string | null | undefined): model is ClaudeModelPreset {
     return typeof model === 'string' && Object.hasOwn(CLAUDE_MODEL_LABELS, model)
 }

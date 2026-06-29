@@ -35,7 +35,10 @@ export const PERMISSION_MODES = [
 ] as const
 export type PermissionMode = typeof PERMISSION_MODES[number]
 
-export type AgentFlavor = 'claude' | 'codex' | 'gemini' | 'opencode' | 'cursor'
+export const GLM_PERMISSION_MODES = ['default', 'yolo'] as const
+export type GlmPermissionMode = typeof GLM_PERMISSION_MODES[number]
+
+export type AgentFlavor = 'claude' | 'codex' | 'gemini' | 'opencode' | 'cursor' | 'glm'
 
 export const PERMISSION_MODE_LABELS: Record<PermissionMode, string> = {
     default: 'Default',
@@ -101,6 +104,9 @@ export function getPermissionModesForFlavor(flavor?: string | null): readonly Pe
     }
     if (flavor === 'cursor') {
         return CURSOR_PERMISSION_MODES
+    }
+    if (flavor === 'glm') {
+        return GLM_PERMISSION_MODES
     }
     return CLAUDE_PERMISSION_MODES
 }

@@ -6,6 +6,7 @@ import { connectCommand } from './connect'
 import { runnerCommand } from './runner'
 import { doctorCommand } from './doctor'
 import { geminiCommand } from './gemini'
+import { glmCommand } from './glm'
 import { opencodeCommand } from './opencode'
 import { hookForwarderCommand } from './hookForwarder'
 import { mcpCommand } from './mcp'
@@ -19,6 +20,7 @@ const COMMANDS: CommandDefinition[] = [
     codexCommand,
     cursorCommand,
     geminiCommand,
+    glmCommand,
     opencodeCommand,
     mcpCommand,
     hubCommand,
