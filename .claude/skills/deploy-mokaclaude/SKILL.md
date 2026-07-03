@@ -72,18 +72,9 @@ PYEOF
    STYLE='<style>button[aria-label="Terminal"],button[aria-label="终端"]{display:none!important}</style>'
    grep -q 'aria-label="终端"' index.html || sed -i '' "s|</head>|${STYLE}</head>|" index.html
 
-   # c. 改 bundle 文件名破缓存（因为 vite 对同名文件打 immutable 1 年 cache）
-   cd assets
-   OLD_JS=$(ls index-*.js | grep -v moka | head -1 || echo "")
-   OLD_CSS=$(ls index-*.css | grep -v moka | head -1 || echo "")
-   if [ -n "$OLD_JS" ]; then
-     NEW_JS="${OLD_JS%.js}-moka.js"; mv "$OLD_JS" "$NEW_JS"
-     cd .. && sed -i '' "s|$OLD_JS|$NEW_JS|g" index.html sw.js 2>/dev/null; cd assets
-   fi
-   if [ -n "$OLD_CSS" ]; then
-     NEW_CSS="${OLD_CSS%.css}-moka.css"; mv "$OLD_CSS" "$NEW_CSS"
-     cd .. && sed -i '' "s|$OLD_CSS|$NEW_CSS|g" index.html sw.js 2>/dev/null
-   fi
+   # c. ⚠️ 不要给 index-*.js/css 改名破缓存！Vite 文件名自带 content hash 天然破缓存。
+   # 改名只替换得到 index.html/sw.js 的引用，但几十个懒加载 chunk（mermaid/vendor 等）
+   # 内部 import 的还是原名 → 全部 404 断链（2026-07-03 踩坑：上传/聊天渲染全挂）。
    ```
 
 5. **部署**
