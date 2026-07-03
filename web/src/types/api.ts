@@ -75,6 +75,7 @@ export type Machine = {
 
 export type AuthResponse = {
     token: string
+    mustChangePassword?: boolean
     user: {
         id: number
         username?: string

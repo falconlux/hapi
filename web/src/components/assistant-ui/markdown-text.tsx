@@ -21,7 +21,22 @@ import { ImageLightbox } from '@/components/ImageLightbox'
 
 import type { MarkdownTextPrimitiveProps } from '@assistant-ui/react-markdown'
 
-export const MARKDOWN_PLUGINS = [remarkGfm, remarkStripCjkAutolink, remarkMath, remarkDisableIndentedCode] satisfies NonNullable<MarkdownTextPrimitiveProps['remarkPlugins']>
+// iOS < 16.4 WebKit and old Android kernels lack regex lookbehind support.
+// remark-gfm's autolink dependency constructs a lookbehind RegExp at runtime,
+// which throws SyntaxError there and crashes the whole chat into the error boundary.
+// On those browsers drop GFM (tables/strikethrough/autolink) but keep base markdown.
+const supportsRegexLookbehind = (() => {
+    try {
+        new RegExp('(?<=a)b')
+        return true
+    } catch {
+        return false
+    }
+})()
+
+export const MARKDOWN_PLUGINS = (supportsRegexLookbehind
+    ? [remarkGfm, remarkStripCjkAutolink, remarkMath, remarkDisableIndentedCode]
+    : [remarkMath, remarkDisableIndentedCode]) satisfies NonNullable<MarkdownTextPrimitiveProps['remarkPlugins']>
 export const MARKDOWN_REHYPE_PLUGINS = [rehypeKatex] satisfies NonNullable<MarkdownTextPrimitiveProps['rehypePlugins']>
 export const MARKDOWN_CLASSNAME = 'aui-md happy-chat-text min-w-0 max-w-full break-words text-[var(--app-fg)]'
 export const MARKDOWN_COMPONENTS_BY_LANGUAGE = {
