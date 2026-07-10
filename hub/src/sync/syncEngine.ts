@@ -457,7 +457,7 @@ export class SyncEngine {
     async spawnSession(
         machineId: string,
         directory: string,
-        agent: 'claude' | 'codex' | 'cursor' | 'gemini' | 'opencode' = 'claude',
+        agent: 'claude' | 'codex' | 'cursor' | 'gemini' | 'glm' | 'opencode' = 'claude',
         model?: string,
         modelReasoningEffort?: string,
         yolo?: boolean,

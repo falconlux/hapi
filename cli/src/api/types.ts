@@ -36,7 +36,6 @@ export const MachineMetadataSchema = z.object({
     displayName: z.string().optional(),
     cwd: z.string().optional(),
     homeDir: z.string(),
-    cwd: z.string().optional(),
     happyHomeDir: z.string(),
     happyLibDir: z.string(),
     workspaceRoot: z.string().optional(),
