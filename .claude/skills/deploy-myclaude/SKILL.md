@@ -21,13 +21,9 @@ argument-hint: [hub|web|all]
 - HAPI_HOME：`/home/ubuntu/.hapi-myclaude/`
 - Base CLI Token：`my2026`（存储在 `ubuntu@myclaude.1to10.cn:~/.hapi-myclaude/settings.json`）
 
-## 特殊分支：密码 + MyClaude 功能
+## 分支说明（2026-07-10 起）
 
-所有 mokaclaude / myclaude 专属改动都在 **`mokaclaude-password-auth` 分支**（勿合 main）。部署时：
-
-1. `git checkout mokaclaude-password-auth`
-2. 跑下面的构建 + 部署流程
-3. `git checkout main`（保留分支，不 merge）
+**直接从 `main` 部署。** 原 `mokaclaude-password-auth` 分支已合入 main 并删除（密码认证早已是三实例通用功能，主 hapi 线上 6 月 21 日起就在用）。备份 ref：`backup/moka-pw-20260710`。
 
 ## Workflow
 

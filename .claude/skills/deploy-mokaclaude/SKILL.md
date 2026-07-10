@@ -123,14 +123,9 @@ else:
    - 各组件部署状态
    - 提示浏览器刷新 / 重装 PWA
 
-## 特殊分支：密码认证功能
+## 密码认证功能
 
-MokaClaude 专属的"访问令牌 + 密码"双因素登录**只在 `mokaclaude-password-auth` 分支有源码**（切勿合入 main）。
-
-**部署时：**
-1. `git checkout mokaclaude-password-auth`
-2. 跑下面的构建 + 部署流程
-3. `git checkout main`（保留分支，不 merge）
+"访问令牌 + 密码"双因素登录已在 **main 分支**（2026-07-10 起原 `mokaclaude-password-auth` 分支合入 main 并删除，备份 ref `backup/moka-pw-20260710`）。**直接从 main 部署。**
 
 **功能要点（已在源码里实现）：**
 - `hub/src/config/passwordStore.ts` — bcrypt + `~/.hapi/passwords.json`
