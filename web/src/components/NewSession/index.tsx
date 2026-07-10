@@ -12,6 +12,7 @@ import { useDirectorySuggestions } from '@/hooks/useDirectorySuggestions'
 import { useRecentPaths } from '@/hooks/useRecentPaths'
 import { useTranslation } from '@/lib/use-translation'
 import type { AgentType, ClaudeEffort, CodexReasoningEffort, SessionType } from './types'
+import { MODEL_OPTIONS } from './types'
 import { ActionButtons } from './ActionButtons'
 import { AgentSelector } from './AgentSelector'
 import { DirectorySection } from './DirectorySection'
@@ -128,6 +129,12 @@ export function NewSession(props: {
                 value: codexModel.id,
                 label: codexModel.displayName
             })
+        }
+        // codex 二进制的注册表不含网关特有模型（如 gpt-5.6-luna/sol/terra），合并本地预设兜底
+        const seen = new Set(options.map((option) => option.value))
+        for (const preset of MODEL_OPTIONS.codex) {
+            if (preset.value === 'auto' || seen.has(preset.value)) continue
+            options.push({ value: preset.value, label: preset.label })
         }
         if (model !== 'auto' && !options.some((option) => option.value === model)) {
             options.splice(1, 0, { value: model, label: model })
