@@ -5,6 +5,7 @@
 
 import { logger } from '@/ui/logger';
 import { clearRunnerState, readRunnerState, readSettings } from '@/persistence';
+import type { RunnerLocallyPersistedState } from '@/persistence';
 import { Metadata } from '@/api/types';
 import packageJson from '../../package.json';
 import { existsSync, statSync } from 'node:fs';
@@ -137,20 +138,95 @@ export async function stopRunnerHttp(): Promise<void> {
  * We can destructure the response on the caller for richer output.
  * For instance when running `hapi runner status` we can show more information.
  */
+async function verifyRunnerHealth(state: RunnerLocallyPersistedState): Promise<'ours' | 'stale' | 'unknown'> {
+  if (!state.httpPort) {
+    return 'unknown';
+  }
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${state.httpPort}/health`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(2000)
+    });
+
+    if (!response.ok) {
+      logger.debug(`[RUNNER CONTROL] Runner health check returned HTTP ${response.status}`);
+      return 'stale';
+    }
+
+    const body = await response.json() as {
+      pid?: unknown;
+      machineId?: unknown;
+    };
+    const pidMatches = body.pid === state.pid;
+    const machineIdMatches = state.startedWithMachineId == null
+      || body.machineId === state.startedWithMachineId;
+
+    if (pidMatches && machineIdMatches) {
+      return 'ours';
+    }
+
+    logger.debug('[RUNNER CONTROL] Runner health identity mismatch', {
+      expectedPid: state.pid,
+      actualPid: body.pid,
+      expectedMachineId: state.startedWithMachineId,
+      actualMachineId: body.machineId
+    });
+    return 'stale';
+  } catch (error) {
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      logger.debug('[RUNNER CONTROL] Runner health check timed out');
+      return 'unknown';
+    }
+
+    if (error instanceof Error && error.name === 'AbortError') {
+      logger.debug('[RUNNER CONTROL] Runner health check aborted');
+      return 'unknown';
+    }
+
+    const errorCode = error && typeof error === 'object' && 'code' in error
+      ? error.code
+      : undefined;
+    const causeCode = error && typeof error === 'object' && 'cause' in error
+      && error.cause && typeof error.cause === 'object' && 'code' in error.cause
+      ? error.cause.code
+      : undefined;
+    if (
+      error instanceof TypeError
+      || errorCode === 'ConnectionRefused'
+      || errorCode === 'ECONNREFUSED'
+      || errorCode === 'FailedToOpenSocket'
+      || causeCode === 'ECONNREFUSED'
+    ) {
+      logger.debug('[RUNNER CONTROL] Runner health check connection failed', error);
+      return 'stale';
+    }
+
+    logger.debug('[RUNNER CONTROL] Runner health check could not be verified', error);
+    return 'unknown';
+  }
+}
+
 export async function checkIfRunnerRunningAndCleanupStaleState(): Promise<boolean> {
   const state = await readRunnerState();
   if (!state) {
     return false;
   }
 
-  // Check if the runner is running
-  if (isProcessAlive(state.pid)) {
-    return true;
+  if (!isProcessAlive(state.pid)) {
+    logger.debug('[RUNNER RUN] Runner PID not running, cleaning up state');
+    await cleanupRunnerState();
+    return false;
   }
 
-  logger.debug('[RUNNER RUN] Runner PID not running, cleaning up state');
-  await cleanupRunnerState();
-  return false;
+  const verdict = await verifyRunnerHealth(state);
+  if (verdict === 'stale') {
+    logger.debug('[RUNNER CONTROL] Runner health check found stale state, cleaning up');
+    await cleanupRunnerState();
+    return false;
+  }
+
+  return true;
 }
 
 /**

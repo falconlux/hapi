@@ -692,7 +692,11 @@ export async function startRunner(options: { workspaceRoots?: string[] } = {}): 
       stopSession,
       spawnSession,
       requestShutdown: () => requestShutdown('hapi-cli'),
-      onHappySessionWebhook
+      onHappySessionWebhook,
+      identity: {
+        machineId,
+        cliVersion: packageJson.version
+      }
     });
 
     const startedWithCliMtimeMs = getInstalledCliMtimeMs();

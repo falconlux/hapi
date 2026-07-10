@@ -16,13 +16,18 @@ export function startRunnerControlServer({
   stopSession,
   spawnSession,
   requestShutdown,
-  onHappySessionWebhook
+  onHappySessionWebhook,
+  identity
 }: {
   getChildren: () => TrackedSession[];
   stopSession: (sessionId: string) => boolean;
   spawnSession: (options: SpawnSessionOptions) => Promise<SpawnSessionResult>;
   requestShutdown: () => void;
   onHappySessionWebhook: (sessionId: string, metadata: Metadata) => void;
+  identity: {
+    machineId?: string;
+    cliVersion: string;
+  };
 }): Promise<{ port: number; stop: () => Promise<void> }> {
   return new Promise((resolve) => {
     const app = fastify({
@@ -33,6 +38,25 @@ export function startRunnerControlServer({
     app.setValidatorCompiler(validatorCompiler);
     app.setSerializerCompiler(serializerCompiler);
     const typed = app.withTypeProvider<ZodTypeProvider>();
+
+    typed.post('/health', {
+      schema: {
+        response: {
+          200: z.object({
+            pid: z.number(),
+            machineId: z.string().nullable(),
+            cliVersion: z.string()
+          })
+        }
+      }
+    }, async () => {
+      logger.debug('[CONTROL SERVER] Health check received');
+      return {
+        pid: process.pid,
+        machineId: identity.machineId ?? null,
+        cliVersion: identity.cliVersion
+      };
+    });
 
     // Session reports itself after creation
     typed.post('/session-started', {
