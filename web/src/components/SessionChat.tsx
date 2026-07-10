@@ -19,6 +19,7 @@ import { reconcileChatBlocks } from '@/chat/reconcile'
 import { buildConversationOutline } from '@/chat/outline'
 import { isQueuedForInvocation } from '@/lib/messages'
 import { HappyComposer } from '@/components/AssistantChat/HappyComposer'
+import { MODEL_OPTIONS } from '@/components/NewSession/types'
 import { HappyThread } from '@/components/AssistantChat/HappyThread'
 import { QueuedMessagesBar } from '@/components/AssistantChat/QueuedMessagesBar'
 import { useHappyRuntime } from '@/lib/assistant-runtime'
@@ -101,6 +102,14 @@ export function SessionChat(props: {
                 value: codexModel.id,
                 label: codexModel.displayName
             })
+        }
+        // codex 二进制的注册表不含网关特有模型（如 gpt-5.6-luna/sol/terra），合并本地预设兜底
+        if (options.length > 0) {
+            const seen = new Set(options.map((option) => option.value))
+            for (const preset of MODEL_OPTIONS.codex) {
+                if (preset.value === 'auto' || seen.has(preset.value)) continue
+                options.push({ value: preset.value, label: preset.label })
+            }
         }
         return options
     }, [agentFlavor, codexModelsState.models])
