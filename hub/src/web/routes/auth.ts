@@ -8,6 +8,7 @@ import { validateTelegramInitData } from '../telegramInitData'
 import { getOrCreateOwnerId } from '../../config/ownerId'
 import {
     getEntry as getPasswordEntry,
+    ensureDefault as ensureDefaultPassword,
     verify as verifyPassword,
     changePassword
 } from '../../config/passwordStore'
@@ -144,6 +145,25 @@ export function createAuthRoutes(jwtSecret: Uint8Array, store: Store): Hono<WebA
             .sign(jwtSecret)
 
         return c.json({ success: true, token })
+    })
+
+    app.post('/auth/register', async (c) => {
+        const json = await c.req.json().catch(() => null)
+        const parsed = z.object({ accessToken: z.string() }).safeParse(json)
+        if (!parsed.success) {
+            return c.json({ error: 'Invalid body' }, 400)
+        }
+        const parsedToken = parseAccessToken(parsed.data.accessToken)
+        if (!parsedToken || (parsedToken.baseToken && !constantTimeEquals(parsedToken.baseToken, configuration.cliApiToken))) {
+            return c.json({ error: 'Invalid access token' }, 401)
+        }
+        const namespace = parsedToken.namespace
+        const existing = await getPasswordEntry(namespace)
+        if (existing) {
+            return c.json({ error: 'User already exists', exists: true }, 409)
+        }
+        await ensureDefaultPassword(namespace)
+        return c.json({ success: true, namespace, defaultPassword: true })
     })
 
     return app
