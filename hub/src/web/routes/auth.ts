@@ -8,7 +8,6 @@ import { validateTelegramInitData } from '../telegramInitData'
 import { getOrCreateOwnerId } from '../../config/ownerId'
 import {
     getEntry as getPasswordEntry,
-    ensureDefault as ensureDefaultPassword,
     verify as verifyPassword,
     changePassword
 } from '../../config/passwordStore'
@@ -60,22 +59,19 @@ export function createAuthRoutes(jwtSecret: Uint8Array, store: Store): Hono<WebA
             }
             namespace = parsedToken.namespace
 
-            // Password gate: auto-seed default (mustChange=true) then require.
-            let entry = await getPasswordEntry(namespace)
+            // Password gate: only allow pre-created namespaces (no auto-seed).
+            const entry = await getPasswordEntry(namespace)
             if (!entry) {
-                await ensureDefaultPassword(namespace)
-                entry = await getPasswordEntry(namespace)
+                return c.json({ error: 'User not found', userNotFound: true }, 401)
             }
-            if (entry) {
-                if (!parsed.data.password) {
-                    return c.json({ error: 'Password required', passwordRequired: true }, 401)
-                }
-                const result = await verifyPassword(namespace, parsed.data.password)
-                if (!result.valid) {
-                    return c.json({ error: 'Invalid password', passwordRequired: true }, 401)
-                }
-                mustChange = result.mustChange
+            if (!parsed.data.password) {
+                return c.json({ error: 'Password required', passwordRequired: true }, 401)
             }
+            const result = await verifyPassword(namespace, parsed.data.password)
+            if (!result.valid) {
+                return c.json({ error: 'Invalid password', passwordRequired: true }, 401)
+            }
+            mustChange = result.mustChange
 
             userId = await getOrCreateOwnerId()
             firstName = 'Web User'
