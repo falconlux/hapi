@@ -7,6 +7,7 @@ import {
     getSessionTimeRange,
     getNextSessionVisibleCount,
     getSessionDedupKey,
+    groupSessionsByDirectory,
     getWorktreeSessionLabel,
     getVisibleSessionPreview,
     isSidebarEmptySessionStub,
@@ -429,7 +430,7 @@ describe('getNextSessionVisibleCount', () => {
 })
 
 describe('expandSelectedSessionCollapseOverrides', () => {
-    it('expands collapsed project and machine, but preserves session preview folding', () => {
+    it('expands the collapsed project but preserves unrelated overrides', () => {
         const overrides = new Map<string, boolean>([
             ['machine-1::/work/hapi', true],
             ['sessions::machine-1::/work/hapi', true],
@@ -443,7 +444,7 @@ describe('expandSelectedSessionCollapseOverrides', () => {
 
         expect(result.has('machine-1::/work/hapi')).toBe(false)
         expect(result.get('sessions::machine-1::/work/hapi')).toBe(true)
-        expect(result.has('machine::machine-1')).toBe(false)
+        expect(result.get('machine::machine-1')).toBe(true)
     })
 
     it('leaves missing session preview override unset', () => {
@@ -455,5 +456,56 @@ describe('expandSelectedSessionCollapseOverrides', () => {
         })
 
         expect(result.has('sessions::machine-1::/work/hapi')).toBe(false)
+    })
+})
+
+describe('groupSessionsByDirectory', () => {
+    it('returns machine-scoped directory groups directly without merging identical paths', () => {
+        const groups = groupSessionsByDirectory([
+            makeSession({
+                id: 'machine-a-session',
+                metadata: { path: '/work/hapi', machineId: 'machine-a' },
+                updatedAt: 200
+            }),
+            makeSession({
+                id: 'machine-b-session',
+                metadata: { path: '/work/hapi', machineId: 'machine-b' },
+                updatedAt: 100
+            })
+        ])
+
+        expect(groups).toHaveLength(2)
+        expect(groups.map(group => group.key)).toEqual([
+            'machine-a::/work/hapi',
+            'machine-b::/work/hapi'
+        ])
+        expect(groups.every(group => group.displayName === 'work/hapi')).toBe(true)
+    })
+
+    it('marks a directory as thinking only for an active thinking child session', () => {
+        const groups = groupSessionsByDirectory([
+            makeSession({
+                id: 'inactive-thinking',
+                thinking: true,
+                metadata: { path: '/work/inactive', machineId: 'machine-a' }
+            }),
+            makeSession({
+                id: 'active-not-thinking',
+                active: true,
+                metadata: { path: '/work/active', machineId: 'machine-a' }
+            }),
+            makeSession({
+                id: 'active-thinking',
+                active: true,
+                thinking: true,
+                metadata: { path: '/work/thinking', machineId: 'machine-a' }
+            })
+        ])
+
+        expect(Object.fromEntries(groups.map(group => [group.directory, group.hasThinkingSession]))).toEqual({
+            '/work/active': false,
+            '/work/thinking': true,
+            '/work/inactive': false
+        })
     })
 })

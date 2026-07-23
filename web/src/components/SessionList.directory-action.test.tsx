@@ -49,6 +49,43 @@ function renderWithProviders(children: ReactNode) {
 }
 
 describe('SessionList directory action', () => {
+    it('uses a semantic directory toggle without nesting header actions', () => {
+        const session = makeSession({
+            id: 'session-1',
+            updatedAt: Date.now(),
+            metadata: {
+                path: '/home/ubuntu',
+                machineId: 'machine-1',
+                name: 'Greeting',
+                flavor: 'codex',
+            }
+        })
+
+        renderWithProviders(
+            <SessionList
+                sessions={[session]}
+                selectedSessionId={null}
+                onSelect={vi.fn()}
+                onNewSession={vi.fn()}
+                onNewSessionInDirectory={vi.fn()}
+                onRefresh={vi.fn()}
+                isLoading={false}
+                renderHeader={false}
+                api={null}
+            />
+        )
+
+        const toggle = screen.getByRole('button', { name: 'home/ubuntu' })
+        const newSessionButton = screen.getByRole('button', { name: 'New session in this directory' })
+
+        expect(toggle).toHaveAttribute('aria-expanded', 'false')
+        expect(toggle.contains(newSessionButton)).toBe(false)
+
+        fireEvent.click(toggle)
+
+        expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    })
+
     it('starts a new session with the project machine and directory', () => {
         const onNewSessionInDirectory = vi.fn()
         const session = makeSession({
