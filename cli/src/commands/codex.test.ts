@@ -94,6 +94,12 @@ describe('codexCommand', () => {
         })
     })
 
+    it.each(['max', 'ultra'] as const)('forwards %s model reasoning effort', async (modelReasoningEffort) => {
+        await codexCommand.run(createCommandContext(['--model-reasoning-effort', modelReasoningEffort]))
+
+        expect(runCodexMock).toHaveBeenCalledWith({ modelReasoningEffort })
+    })
+
     it('forwards a valid --service-tier to runCodex', async () => {
         await codexCommand.run(createCommandContext(['--started-by', 'runner', '--service-tier', 'fast']))
 

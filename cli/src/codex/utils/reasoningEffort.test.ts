@@ -6,6 +6,10 @@ describe('parseReasoningEffortValue', () => {
         expect(parseReasoningEffortValue(' EXTREME ')).toBe('extreme');
     });
 
+    it.each(['max', 'ultra'] as const)('accepts %s', (effort) => {
+        expect(parseReasoningEffortValue(effort)).toBe(effort);
+    });
+
     it('maps null to the default effort', () => {
         expect(parseReasoningEffortValue(null)).toBeUndefined();
     });

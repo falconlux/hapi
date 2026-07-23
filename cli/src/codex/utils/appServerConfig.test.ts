@@ -147,11 +147,17 @@ describe('appServerConfig', () => {
         });
     });
 
-    it('passes model reasoning effort via thread config', () => {
+    it.each(['max', 'ultra'] as const)('passes %s reasoning effort via thread and turn config', (modelReasoningEffort) => {
         const params = buildThreadStartParams({
             cwd: '/workspace/project',
-            mode: { permissionMode: 'default', modelReasoningEffort: 'ultra', collaborationMode: 'default' },
+            mode: { permissionMode: 'default', model: 'gpt-5.5', modelReasoningEffort, collaborationMode: 'default' },
             mcpServers
+        });
+        const turnParams = buildTurnStartParams({
+            threadId: 'thread-1',
+            message: 'hello',
+            cwd: '/workspace/project',
+            mode: { permissionMode: 'default', model: 'gpt-5.5', modelReasoningEffort, collaborationMode: 'default' }
         });
 
         expect(params.config).toEqual({
@@ -160,8 +166,9 @@ describe('appServerConfig', () => {
                 args: ['mcp']
             },
             developer_instructions: codexSystemPrompt,
-            model_reasoning_effort: 'ultra'
+            model_reasoning_effort: modelReasoningEffort
         });
+        expect(turnParams.effort).toBe(modelReasoningEffort);
     });
 
     it('translates Fast to the advertised app-server tier (priority) in thread params', () => {

@@ -8,7 +8,9 @@ describe('getCodexComposerReasoningEffortOptions', () => {
             { value: 'low', label: 'Low' },
             { value: 'medium', label: 'Medium' },
             { value: 'high', label: 'High' },
-            { value: 'xhigh', label: 'XHigh' }
+            { value: 'xhigh', label: 'XHigh' },
+            { value: 'max', label: 'Max' },
+            { value: 'ultra', label: 'Ultra' }
         ])
     })
 
@@ -19,7 +21,9 @@ describe('getCodexComposerReasoningEffortOptions', () => {
             { value: 'low', label: 'Low' },
             { value: 'medium', label: 'Medium' },
             { value: 'high', label: 'High' },
-            { value: 'xhigh', label: 'XHigh' }
+            { value: 'xhigh', label: 'XHigh' },
+            { value: 'max', label: 'Max' },
+            { value: 'ultra', label: 'Ultra' }
         ])
     })
 
@@ -45,14 +49,32 @@ describe('getCodexComposerReasoningEffortOptions', () => {
     })
 
     it('keeps an unsupported current Codex effort visible', () => {
-        expect(getCodexComposerReasoningEffortOptions('ultra', 'codex', [
+        expect(getCodexComposerReasoningEffortOptions('extreme', 'codex', [
             { value: 'low' },
             { value: 'max' }
         ])).toEqual([
             { value: null, label: 'Default' },
-            { value: 'ultra', label: 'Ultra' },
+            { value: 'extreme', label: 'Extreme' },
             { value: 'low', label: 'Low' },
-            { value: 'max', label: 'Max' }
+            { value: 'max', label: 'Max' },
+            { value: 'ultra', label: 'Ultra' }
+        ])
+    })
+
+    it('adds Max and Ultra when Codex dynamic options omit them', () => {
+        expect(getCodexComposerReasoningEffortOptions(null, 'codex', [
+            { value: 'low' },
+            { value: 'medium' },
+            { value: 'high' },
+            { value: 'xhigh' }
+        ])).toEqual([
+            { value: null, label: 'Default' },
+            { value: 'low', label: 'Low' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'high', label: 'High' },
+            { value: 'xhigh', label: 'XHigh' },
+            { value: 'max', label: 'Max' },
+            { value: 'ultra', label: 'Ultra' }
         ])
     })
 

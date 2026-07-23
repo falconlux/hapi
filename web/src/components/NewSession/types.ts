@@ -51,6 +51,7 @@ export const CODEX_REASONING_EFFORT_OPTIONS: { value: CodexReasoningEffort; labe
     { value: 'high', label: 'High' },
     { value: 'xhigh', label: 'XHigh' },
     { value: 'max', label: 'Max' },
+    { value: 'ultra', label: 'Ultra' },
 ]
 
 export const CLAUDE_EFFORT_OPTIONS: { value: LaunchEffort; label: string }[] = [

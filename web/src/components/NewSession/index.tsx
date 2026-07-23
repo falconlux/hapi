@@ -280,6 +280,8 @@ export function NewSession(props: {
         if (
             agent !== 'codex'
             || modelReasoningEffort === 'default'
+            || modelReasoningEffort === 'max'
+            || modelReasoningEffort === 'ultra'
             || !codexSupportedReasoningEfforts
             || codexSupportedReasoningEfforts.includes(modelReasoningEffort)
         ) {
