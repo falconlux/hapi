@@ -6,6 +6,7 @@ import {
     isScratchlistToggleHotkey,
     resolvePiContextWindow,
     shouldAutoClearPendingSchedule,
+    shouldClearUnsupportedCodexReasoningEffort,
     shouldRouteToScratchlist,
 } from './SessionChat'
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
@@ -44,6 +45,18 @@ describe('applyModelChangeWithReasoningRollback', () => {
         expect(setModelReasoningEffort).toHaveBeenCalledOnce()
         expect(setModelReasoningEffort).toHaveBeenCalledWith(null)
         expect(setModel).toHaveBeenCalledWith('gpt-next')
+    })
+})
+
+describe('shouldClearUnsupportedCodexReasoningEffort', () => {
+    it('preserves max and ultra when model capabilities omit them', () => {
+        expect(shouldClearUnsupportedCodexReasoningEffort('max', false)).toBe(false)
+        expect(shouldClearUnsupportedCodexReasoningEffort('Ultra', false)).toBe(false)
+    })
+
+    it('clears other explicitly unsupported efforts', () => {
+        expect(shouldClearUnsupportedCodexReasoningEffort('xhigh', false)).toBe(true)
+        expect(shouldClearUnsupportedCodexReasoningEffort('high', undefined)).toBe(false)
     })
 })
 

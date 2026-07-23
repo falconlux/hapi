@@ -112,6 +112,14 @@ export async function applyModelChangeWithReasoningRollback(args: {
     }
 }
 
+export function shouldClearUnsupportedCodexReasoningEffort(
+    effort: string | null | undefined,
+    isSupported: boolean | undefined
+): boolean {
+    const normalizedEffort = effort?.trim().toLowerCase()
+    return isSupported === false && normalizedEffort !== 'max' && normalizedEffort !== 'ultra'
+}
+
 /**
  * Returns whether a PendingSchedule should trigger an auto-clear timer.
  *
@@ -1003,11 +1011,14 @@ function SessionChatInner(props: SessionChatProps) {
         const previousModelReasoningEffort = props.session.modelReasoningEffort
         const shouldClearReasoningEffort = agentFlavor === 'codex'
             && Boolean(previousModelReasoningEffort)
-            && supportsCodexReasoningEffort(
-                codexModelsState.models,
-                model,
-                previousModelReasoningEffort
-            ) === false
+            && shouldClearUnsupportedCodexReasoningEffort(
+                previousModelReasoningEffort,
+                supportsCodexReasoningEffort(
+                    codexModelsState.models,
+                    model,
+                    previousModelReasoningEffort
+                )
+            )
 
         try {
             await applyModelChangeWithReasoningRollback({
