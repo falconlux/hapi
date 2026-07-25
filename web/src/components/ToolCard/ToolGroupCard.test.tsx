@@ -109,6 +109,46 @@ describe('ToolGroupCard', () => {
         expect(view.container.innerHTML).toContain('bg-[var(--app-tool-group-bg)]')
     })
 
+    it('shows live running actions and progress while the group stays collapsed', () => {
+        const completed = makeToolBlock('read-1', 'Read', { file_path: 'repo/src/a.ts' })
+        const running = makeToolBlock('bash-1', 'Bash', { command: 'bun test' })
+        running.tool.state = 'running'
+        running.tool.completedAt = null
+        running.tool.result = null
+        running.tool.startedAt = Date.now() - 5_000
+
+        const view = renderCard(makeGroup({
+            tools: [completed, running],
+            summary: {
+                totalTools: 2,
+                countsByKind: {
+                    read: 1,
+                    search: 0,
+                    command: 1,
+                    mutation: 0,
+                    web: 0,
+                    other: 0,
+                },
+                fileTargets: ['repo/src/a.ts'],
+                commandTargets: ['bun test'],
+                searchTargets: [],
+                urlTargets: [],
+                otherTargets: [],
+                errorCount: 0,
+                runningCount: 1,
+                pendingCount: 0,
+            },
+        }))
+
+        const groupToggle = within(view.container).getByRole('button', { name: /inspect a\.ts/i })
+        expect(groupToggle).toHaveAttribute('aria-expanded', 'false')
+        expect(screen.getByText('1/2 done')).toBeInTheDocument()
+        expect(screen.getByText('1 running')).toBeInTheDocument()
+        expect(screen.getByText('bun test')).toBeInTheDocument()
+        expect(screen.getByText('Running')).toBeInTheDocument()
+        expect(screen.queryByText('2 actions')).not.toBeInTheDocument()
+    })
+
     it('expands to show compact rows and opens a detail dialog per row', async () => {
         const view = renderCard(makeGroup())
         const groupToggle = within(view.container).getByRole('button', { name: /inspect a\.ts/i })

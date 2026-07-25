@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { formatDuration } from '@/chat/presentation'
 import type { ToolGroupBlock } from '@/chat/toolGroups'
 import type { ToolCallBlock } from '@/chat/types'
 import type { SessionMetadataSummary } from '@/types/api'
@@ -23,6 +24,22 @@ function SummaryBadge(props: { className: string; text: string }) {
     return (
         <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', props.className)}>
             {props.text}
+        </span>
+    )
+}
+
+function ActiveElapsed(props: { block: ToolCallBlock }) {
+    const startedAt = props.block.tool.startedAt ?? props.block.tool.createdAt
+    const [now, setNow] = useState(() => Date.now())
+
+    useEffect(() => {
+        const timer = setInterval(() => setNow(Date.now()), 1_000)
+        return () => clearInterval(timer)
+    }, [])
+
+    return (
+        <span className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--app-hint)]">
+            {formatDuration(Math.max(0, now - startedAt))}
         </span>
     )
 }
@@ -221,6 +238,12 @@ export function ToolGroupCard(props: {
     const primaryTitle = formatGroupedHeaderTitle(props.block, t)
     const subtitle = formatGroupedHeaderSubtitle(props.block, t) ?? formatActionSummary(props.block, t)
     const fileCount = props.block.summary.fileTargets.length
+    const activeTools = props.block.tools.filter((tool) => (
+        tool.tool.state === 'running' || tool.tool.state === 'pending'
+    ))
+    const visibleActiveTools = activeTools.slice(-2)
+    const completedCount = props.block.tools.filter((tool) => tool.tool.state === 'completed').length
+    const isActive = activeTools.length > 0
 
     return (
         <Card className="overflow-hidden rounded-[20px] bg-[var(--app-tool-group-bg)] shadow-none">
@@ -251,7 +274,12 @@ export function ToolGroupCard(props: {
                         <div className="flex shrink-0 items-center gap-2 self-center text-[var(--app-hint)]">
                             <SummaryBadge
                                 className="bg-[var(--app-subtle-bg)] text-[var(--app-hint)]"
-                                text={t('toolGroup.toolCount', { n: props.block.tools.length })}
+                                text={isActive
+                                    ? t('toolGroup.progress', {
+                                        completed: completedCount,
+                                        total: props.block.tools.length
+                                    })
+                                    : t('toolGroup.toolCount', { n: props.block.tools.length })}
                             />
                             {props.block.summary.runningCount > 0 ? (
                                 <SummaryBadge
@@ -281,6 +309,41 @@ export function ToolGroupCard(props: {
                     </div>
                 </button>
             </CardHeader>
+
+            {!open && isActive ? (
+                <CardContent className="px-3 pb-3 pt-0">
+                    <div className="flex flex-col gap-2" aria-label={t('toolGroup.activeNow')}>
+                        {visibleActiveTools.map((tool) => (
+                            <button
+                                key={tool.id}
+                                type="button"
+                                className="flex items-center gap-3 rounded-[16px] border border-sky-500/20 bg-sky-500/5 px-3 py-2 text-left transition-colors hover:bg-sky-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)]"
+                                onClick={() => setSelectedToolId(tool.id)}
+                            >
+                                <span className={cn('shrink-0', toolStatusColorClass(tool.tool.state))}>
+                                    <ToolStatusIcon state={tool.tool.state} />
+                                </span>
+                                <RowLabel block={tool} metadata={props.metadata} />
+                                <div className="flex shrink-0 items-center gap-2">
+                                    {tool.tool.state === 'running' ? <ActiveElapsed block={tool} /> : null}
+                                    <RowStatusBadge block={tool} />
+                                </div>
+                            </button>
+                        ))}
+                        {activeTools.length > visibleActiveTools.length ? (
+                            <button
+                                type="button"
+                                className="text-left text-xs font-medium text-[var(--app-link)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)]"
+                                onClick={() => setOpen(true)}
+                            >
+                                {t('toolGroup.moreActive', {
+                                    n: activeTools.length - visibleActiveTools.length
+                                })}
+                            </button>
+                        ) : null}
+                    </div>
+                </CardContent>
+            ) : null}
 
             {open ? (
                 <CardContent className="px-3 pb-3 pt-1">
