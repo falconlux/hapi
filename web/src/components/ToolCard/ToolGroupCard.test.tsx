@@ -109,11 +109,13 @@ describe('ToolGroupCard', () => {
 
     it('renders a collapsed target-first header', () => {
         const view = renderCard(makeGroup())
+        const groupToggle = screen.getByRole('button', { name: /inspect a\.ts/i })
 
-        expect(screen.getByRole('button', { name: /inspect a\.ts/i })).toHaveAttribute('aria-expanded', 'false')
-        expect(screen.getByText('Run 1 · Read 1')).toBeInTheDocument()
+        expect(groupToggle).toHaveAttribute('aria-expanded', 'false')
+        expect(groupToggle).toHaveTextContent('repo › src/a.ts·2 steps')
+        expect(screen.getByText('Done')).toBeInTheDocument()
+        expect(screen.queryByText('Run 1 · Read 1')).not.toBeInTheDocument()
         expect(screen.queryByText('2 actions')).not.toBeInTheDocument()
-        expect(screen.getByText('Run 1 · Read 1')).toHaveClass('text-xs', 'font-normal', 'text-[var(--app-hint)]')
         expect(screen.queryByText('src/a.ts')).not.toBeInTheDocument()
         expect(screen.queryByText('bun test')).not.toBeInTheDocument()
 
@@ -158,7 +160,7 @@ describe('ToolGroupCard', () => {
         expect(screen.getByText('Started')).toBeInTheDocument()
         expect(screen.getByText('Duration')).toBeInTheDocument()
         expect(screen.queryByText('Finished')).not.toBeInTheDocument()
-        expect(within(view.container).getByLabelText('Running')).toBeInTheDocument()
+        expect(screen.getByText('Running')).toBeInTheDocument()
     })
 
     it('shows final timing in the collapsed header after every tool finishes', () => {
@@ -186,7 +188,8 @@ describe('ToolGroupCard', () => {
         fireEvent.click(groupToggle)
         expect(groupToggle).toHaveAttribute('aria-expanded', 'true')
         expect(view.container.querySelector('svg[data-state="open"]')).toBeInTheDocument()
-        expect(screen.getByText('Run 1 · Read 1')).toBeInTheDocument()
+        expect(screen.getByText('Done')).toBeInTheDocument()
+        expect(screen.queryByText('Run 1 · Read 1')).not.toBeInTheDocument()
         expect(screen.queryByText('2 actions')).not.toBeInTheDocument()
         expect(screen.getByText('src/a.ts')).toBeInTheDocument()
         expect(screen.getByText('bun test')).toBeInTheDocument()
@@ -281,8 +284,10 @@ describe('ToolGroupCard', () => {
             },
         }))
 
-        expect(screen.getByRole('button', { name: /tool activity/i })).toBeInTheDocument()
-        expect(screen.getByText('25 actions')).toBeInTheDocument()
+        const groupToggle = screen.getByRole('button', { name: /tool activity/i })
+        expect(groupToggle).toHaveTextContent('repo·25 steps')
+        expect(screen.getByText('Done')).toBeInTheDocument()
+        expect(screen.queryByText('25 actions')).not.toBeInTheDocument()
         expect(screen.queryByText('Use tool +24')).not.toBeInTheDocument()
         expect(screen.queryByText('Tool 25')).not.toBeInTheDocument()
 
@@ -290,6 +295,33 @@ describe('ToolGroupCard', () => {
 
         expect(screen.getAllByText('Tool').length).toBeGreaterThan(0)
         expect(screen.getByText('Tool 1')).toBeInTheDocument()
+    })
+
+    it.each([
+        {
+            label: 'running',
+            summary: { runningCount: 1, pendingCount: 0, errorCount: 0 },
+            expected: 'Running',
+        },
+        {
+            label: 'pending',
+            summary: { runningCount: 0, pendingCount: 1, errorCount: 0 },
+            expected: 'Waiting',
+        },
+        {
+            label: 'failed',
+            summary: { runningCount: 0, pendingCount: 0, errorCount: 2 },
+            expected: '2 failed',
+        },
+    ])('shows one clear $label group status', ({ summary, expected }) => {
+        const group = makeGroup()
+        Object.assign(group.summary, summary)
+
+        renderCard(group)
+
+        expect(screen.getByText(expected)).toBeInTheDocument()
+        expect(screen.queryByText('Done')).not.toBeInTheDocument()
+        expect(screen.queryByText('2 actions')).not.toBeInTheDocument()
     })
 
     it('auto-loads older history after expand when the group is incomplete', async () => {
