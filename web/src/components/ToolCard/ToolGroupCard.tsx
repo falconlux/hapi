@@ -5,7 +5,7 @@ import type { SessionMetadataSummary } from '@/types/api'
 import { useHappyChatContext } from '@/components/AssistantChat/context'
 import { ToolDetailDialogContent, ToolStatusIcon, toolStatusColorClass } from '@/components/ToolCard/ToolCard'
 import { getToolPresentation } from '@/components/ToolCard/knownTools'
-import { formatGroupedHeaderSubtitle, formatGroupedHeaderTitle } from '@/components/ToolCard/groupedPresentation'
+import { formatGroupedHeaderTitle, getGroupedHeaderMeta } from '@/components/ToolCard/groupedPresentation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
@@ -41,30 +41,34 @@ function RowStatusBadge(props: { block: ToolCallBlock }) {
     return null
 }
 
-function formatActionSummary(block: ToolGroupBlock, t: (key: string, params?: Record<string, string | number>) => string): string | null {
-    const parts: string[] = []
-    const { countsByKind } = block.summary
+function GroupStatusBadge(props: { block: ToolGroupBlock }) {
+    const { t } = useTranslation()
+    const { runningCount, pendingCount, errorCount } = props.block.summary
 
-    if (countsByKind.mutation > 0) {
-        parts.push(t('toolGroup.summary.mutation', { n: countsByKind.mutation }))
-    }
-    if (countsByKind.read > 0) {
-        parts.push(t('toolGroup.summary.read', { n: countsByKind.read }))
-    }
-    if (countsByKind.command > 0) {
-        parts.push(t('toolGroup.summary.command', { n: countsByKind.command }))
-    }
-    if (countsByKind.search > 0) {
-        parts.push(t('toolGroup.summary.search', { n: countsByKind.search }))
-    }
-    if (countsByKind.web > 0) {
-        parts.push(t('toolGroup.summary.web', { n: countsByKind.web }))
-    }
-    if (countsByKind.other > 0 && parts.length > 0) {
-        parts.push(t('toolGroup.summary.other', { n: countsByKind.other }))
+    let state: ToolCallBlock['tool']['state'] = 'completed'
+    let text = t('toolGroup.status.completed')
+    let className = 'bg-[var(--app-subtle-bg)] text-[var(--app-hint)]'
+
+    if (runningCount > 0) {
+        state = 'running'
+        text = t('toolGroup.status.running')
+        className = 'bg-sky-500/10 text-sky-600'
+    } else if (pendingCount > 0) {
+        state = 'pending'
+        text = t('toolGroup.status.pending')
+        className = 'bg-amber-500/10 text-amber-700'
+    } else if (errorCount > 0) {
+        state = 'error'
+        text = t('toolGroup.status.error', { n: errorCount })
+        className = 'bg-red-500/10 text-red-600'
     }
 
-    return parts.length > 0 ? parts.join(' · ') : null
+    return (
+        <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium', className)}>
+            <ToolStatusIcon state={state} />
+            <span>{text}</span>
+        </span>
+    )
 }
 
 function RowLabel(props: { block: ToolCallBlock; metadata: SessionMetadataSummary | null }) {
@@ -219,65 +223,36 @@ export function ToolGroupCard(props: {
     }, [selectedTool, props.metadata, t])
 
     const primaryTitle = formatGroupedHeaderTitle(props.block, t)
-    const subtitle = formatGroupedHeaderSubtitle(props.block, t) ?? formatActionSummary(props.block, t)
-    const fileCount = props.block.summary.fileTargets.length
+    const meta = getGroupedHeaderMeta(props.block, t, props.metadata)
 
     return (
-        <Card className="overflow-hidden rounded-[20px] bg-[var(--app-tool-group-bg)] shadow-none">
-            <CardHeader className={cn('space-y-0 p-3', subtitle ? 'pb-2' : null)}>
+        <Card className="overflow-hidden rounded-[16px] bg-[var(--app-tool-group-bg)] shadow-none">
+            <CardHeader className="space-y-0 p-3 pb-2 transition-colors hover:bg-[var(--app-tool-card-hover-bg)]">
                 <button
                     type="button"
                     onClick={() => setOpen((value) => !value)}
                     className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)]"
                     aria-expanded={open}
                 >
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0 flex flex-1 flex-col gap-1">
-                            <div className="min-w-0 flex items-center gap-2">
-                                <div className="shrink-0 flex h-3.5 w-3.5 items-center justify-center text-[var(--app-tool-card-accent)] leading-none">
-                                    <DetailsIcon open={open} />
-                                </div>
-                                <CardTitle className="min-w-0 truncate whitespace-nowrap text-sm font-medium leading-tight text-[var(--app-fg)]">
-                                    {primaryTitle}
-                                </CardTitle>
-                            </div>
-                            {subtitle ? (
-                                <CardDescription className="truncate whitespace-nowrap font-mono text-xs text-[var(--app-tool-card-subtitle)]">
-                                    {subtitle}
-                                </CardDescription>
-                            ) : null}
+                    <div className="grid grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1">
+                        <div className="flex h-3.5 w-3.5 items-center justify-center text-[var(--app-tool-card-accent)] leading-none">
+                            <DetailsIcon open={open} />
                         </div>
-
-                        <div className="flex shrink-0 items-center gap-2 self-center text-[var(--app-hint)]">
-                            <SummaryBadge
-                                className="bg-[var(--app-subtle-bg)] text-[var(--app-hint)]"
-                                text={t('toolGroup.toolCount', { n: props.block.tools.length })}
-                            />
-                            {props.block.summary.runningCount > 0 ? (
-                                <SummaryBadge
-                                    className="bg-sky-500/10 text-sky-600"
-                                    text={t('toolGroup.badge.running', { n: props.block.summary.runningCount })}
-                                />
-                            ) : null}
-                            {props.block.summary.pendingCount > 0 ? (
-                                <SummaryBadge
-                                    className="bg-amber-500/10 text-amber-700"
-                                    text={t('toolGroup.badge.pending', { n: props.block.summary.pendingCount })}
-                                />
-                            ) : null}
-                            {props.block.summary.errorCount > 0 ? (
-                                <SummaryBadge
-                                    className="bg-red-500/10 text-red-600"
-                                    text={t('toolGroup.badge.error', { n: props.block.summary.errorCount })}
-                                />
-                            ) : null}
-                            {fileCount > 0 ? (
-                                <SummaryBadge
-                                    className="bg-[var(--app-subtle-bg)] text-[var(--app-hint)]"
-                                    text={t('toolGroup.badge.fileTargets', { n: fileCount })}
-                                />
-                            ) : null}
+                        <CardTitle className="min-w-0 truncate whitespace-nowrap text-sm font-medium leading-tight text-[var(--app-fg)]">
+                            {primaryTitle}
+                        </CardTitle>
+                        <div className="flex shrink-0 items-center text-[var(--app-hint)]">
+                            <GroupStatusBadge block={props.block} />
                         </div>
+                        <CardDescription className="col-span-2 col-start-2 flex min-w-0 items-center gap-1 text-xs text-[var(--app-tool-card-subtitle)]">
+                            {meta.location ? (
+                                <>
+                                    <span className="min-w-0 truncate whitespace-nowrap">{meta.location}</span>
+                                    <span className="shrink-0" aria-hidden="true">·</span>
+                                </>
+                            ) : null}
+                            <span className="shrink-0 whitespace-nowrap">{meta.steps}</span>
+                        </CardDescription>
                     </div>
                 </button>
             </CardHeader>
