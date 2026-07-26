@@ -14,6 +14,8 @@ import {
     parseCodexSpawnAgentResult,
     parseCodexWaitAgentResult
 } from '@/components/ToolCard/codexAgents'
+import { formatLiveCommandOutput, getLiveCommandProgress } from '@/components/ToolCard/commandProgress'
+import { useTranslation } from '@/lib/use-translation'
 
 function parseToolUseError(message: string): { isToolUseError: boolean; errorMessage: string | null } {
     const regex = /<tool_use_error>(.*?)<\/tool_use_error>/s
@@ -532,9 +534,31 @@ const BashResultView: ToolViewComponent = (props: ToolViewProps) => {
 }
 
 const CodexBashResultView: ToolViewComponent = (props: ToolViewProps) => {
+    const { t } = useTranslation()
     const result = props.block.tool.result
 
     if (result === undefined || result === null) {
+        const progress = getLiveCommandProgress(props.block.tool.input)
+        const preview = formatLiveCommandOutput(progress?.outputTail ?? '')
+        if (props.block.tool.state === 'running' && preview.text) {
+            return (
+                <div className="flex flex-col gap-2">
+                    <ResultMetaPill>{t('tool.command.running')}</ResultMetaPill>
+                    <CodeBlock
+                        code={preview.text}
+                        language="text"
+                        title={t('tool.command.liveOutput')}
+                        {...resultCodeBlockProps(props.surface, props.surface === 'inline')}
+                    />
+                    {progress?.truncated || preview.clipped ? (
+                        <ResultStatusPill text={t('tool.command.truncated')} />
+                    ) : null}
+                </div>
+            )
+        }
+        if (props.block.tool.state === 'running') {
+            return <ResultStatusPill text={t('tool.command.waitingOutput')} />
+        }
         return <ResultStatusPill text={placeholderForState(props.block.tool.state)} />
     }
 

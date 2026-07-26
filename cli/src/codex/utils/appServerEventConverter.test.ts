@@ -155,7 +155,15 @@ describe('AppServerEventConverter', () => {
             command_source: 'agent'
         }]);
 
-        converter.handleNotification('item/commandExecution/outputDelta', { itemId: 'cmd-1', delta: 'ok' });
+        const output = converter.handleNotification('item/commandExecution/outputDelta', {
+            itemId: 'cmd-1',
+            delta: 'ok'
+        });
+        expect(output).toEqual([{
+            type: 'exec_command_output_delta',
+            call_id: 'cmd-1',
+            delta: 'ok'
+        }]);
         const completed = converter.handleNotification('item/completed', {
             item: {
                 id: 'cmd-1',
@@ -176,6 +184,35 @@ describe('AppServerEventConverter', () => {
             exit_code: 0,
             duration_ms: 42
         }]);
+    });
+
+    it('preserves command output scope and deduplicates mirrored deltas', () => {
+        const converter = new AppServerEventConverter();
+
+        const first = converter.handleNotification('item/commandExecution/outputDelta', {
+            itemId: 'cmd-1',
+            delta: 'running\n',
+            threadId: 'thread-1',
+            turnId: 'turn-1'
+        });
+        const duplicate = converter.handleNotification('codex/event/exec_command_output_delta', {
+            msg: {
+                type: 'exec_command_output_delta',
+                call_id: 'cmd-1',
+                delta: 'running\n',
+                thread_id: 'thread-1',
+                turn_id: 'turn-1'
+            }
+        });
+
+        expect(first).toEqual([{
+            type: 'exec_command_output_delta',
+            thread_id: 'thread-1',
+            turn_id: 'turn-1',
+            call_id: 'cmd-1',
+            delta: 'running\n'
+        }]);
+        expect(duplicate).toEqual([]);
     });
 
     it('maps MCP tool call items', () => {

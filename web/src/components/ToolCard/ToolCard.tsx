@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/use-translation'
 import { TraceSection } from '@/components/ToolCard/trace'
 import { isSubagentToolName } from '@/chat/subagentTool'
+import { formatLiveCommandOutput, getLiveCommandProgress } from '@/components/ToolCard/commandProgress'
 
 const ELAPSED_INTERVAL_MS = 1000
 const TERMINAL_RELATED_TOOL_NAMES = new Set(['Bash', 'CodexBash', 'shell_command', 'run_shell_command'])
@@ -150,6 +151,44 @@ function ToolTimingDetails(props: { block: ToolCallBlock }) {
                     <span className="font-mono text-[var(--app-hint)]">{value}</span>
                 </div>
             ))}
+        </div>
+    )
+}
+
+function RunningCommandPreview(props: { block: ToolCallBlock }) {
+    const { t } = useTranslation()
+    const progress = getLiveCommandProgress(props.block.tool.input)
+    const preview = formatLiveCommandOutput(progress?.outputTail ?? '')
+    const clipped = Boolean(progress?.truncated || preview.clipped)
+
+    return (
+        <div
+            className="mt-1 rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-2"
+            aria-live="polite"
+        >
+            <div className="flex items-center gap-2 text-xs font-medium text-sky-700 dark:text-sky-300">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500" aria-hidden="true" />
+                <span>{t('tool.command.running')}</span>
+            </div>
+            {preview.text ? (
+                <>
+                    <div className="mt-2 text-[10px] font-medium uppercase tracking-wide text-[var(--app-hint)]">
+                        {t('tool.command.liveOutput')}
+                    </div>
+                    <pre className="mt-1 max-h-24 overflow-hidden whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-[var(--app-fg)]">
+                        {preview.text}
+                    </pre>
+                    {clipped ? (
+                        <div className="mt-1 text-[10px] text-[var(--app-hint)]">
+                            {t('tool.command.truncated')}
+                        </div>
+                    ) : null}
+                </>
+            ) : (
+                <div className="mt-1 text-xs text-[var(--app-hint)]">
+                    {t('tool.command.waitingOutput')}
+                </div>
+            )}
         </div>
     )
 }
@@ -427,13 +466,20 @@ function ToolCardInner(props: ToolCardProps) {
 
     const toolName = props.block.tool.name
     const toolTitle = presentation.title
-    const subtitle = presentation.subtitle ?? props.block.tool.description
+    const presentationSubtitle = presentation.subtitle ?? props.block.tool.description
+    const reasoningProgressLabel = toolName === 'CodexReasoning'
+        ? props.block.tool.state === 'running'
+            ? t('tool.progress.current')
+            : t('tool.progress.summary')
+        : null
+    const subtitle = presentationSubtitle ?? reasoningProgressLabel
     const taskSummary = renderTaskSummary(props.block, props.metadata, t)
     const subagentModel = isSubagentToolName(toolName)
         ? getSubagentModel(props.block.children, getInputStringAny(props.block.tool.input, ['model']))
         : null
     const isCodexAgentCard = toolName === 'CodexAgent'
     const useCompactTerminalCard = shouldUseCompactTerminalToolCard(toolName, props.terminalToolDisplayMode)
+    const showCompactCommandProgress = useCompactTerminalCard && props.block.tool.state === 'running'
     const showInline = shouldShowInlineToolCardBody(toolName, presentation.minimal, props.terminalToolDisplayMode)
     const CompactToolView = showInline ? getToolViewComponent(toolName) : null
     const compactViewOwnsInteractions = toolName === 'CodexDiff'
@@ -446,12 +492,14 @@ function ToolCardInner(props: ToolCardProps) {
         permission.status === 'pending'
         || ((permission.status === 'denied' || permission.status === 'canceled') && Boolean(permission.reason))
     ))
-    const hasBody = showInline || taskSummary !== null || showsPermissionFooter
+    const hasBody = showInline || showCompactCommandProgress || taskSummary !== null || showsPermissionFooter
     // Header/content padding already supplies 12-16px below timing; add only
     // the remainder needed to match the detail dialog's 16px section gap.
     const inlineBodySpacing = props.block.tool.state === 'pending'
         ? 'mt-3'
         : (subtitle ? 'mt-1' : 'mt-0')
+    const isLiveActivityCard = props.block.tool.state === 'running'
+        && (TERMINAL_RELATED_TOOL_NAMES.has(toolName) || toolName === 'CodexReasoning')
     const stateColor = toolStatusColorClass(props.block.tool.state)
     const { suppressFocusRing, onTriggerPointerDown, onTriggerKeyDown, onTriggerBlur } = usePointerFocusRing()
     const inlineDetailInvokerRef = useRef<HTMLElement | null>(null)
@@ -487,7 +535,10 @@ function ToolCardInner(props: ToolCardProps) {
 
                 {subtitle ? (
                     <CardDescription className={cn(
-                        'font-mono text-xs text-[var(--app-tool-card-subtitle)]',
+                        'text-xs text-[var(--app-tool-card-subtitle)]',
+                        reasoningProgressLabel && !presentationSubtitle
+                            ? 'font-medium text-sky-700 dark:text-sky-300'
+                            : 'font-mono',
                         isCodexAgentCard || useCompactTerminalCard ? 'truncate whitespace-nowrap' : 'break-all'
                     )}>
                         {truncate(subtitle, 160)}
@@ -519,7 +570,10 @@ function ToolCardInner(props: ToolCardProps) {
     )
 
     return (
-        <Card className="overflow-hidden rounded-[20px] bg-[var(--app-tool-card-bg)] shadow-none">
+        <Card className={cn(
+            'overflow-hidden rounded-[20px] bg-[var(--app-tool-card-bg)] shadow-none',
+            isLiveActivityCard ? 'ring-1 ring-sky-500/25 bg-sky-500/5' : null
+        )}>
             <CardHeader className={cn('space-y-0 p-3', subtitle ? 'pb-2' : null)}>
                 <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
                     <DialogTrigger asChild>
@@ -558,6 +612,10 @@ function ToolCardInner(props: ToolCardProps) {
 
             {hasBody ? (
                 <CardContent className="px-3 pb-3 pt-1">
+                    {showCompactCommandProgress ? (
+                        <RunningCommandPreview block={props.block} />
+                    ) : null}
+
                     {taskSummary ? (
                         <div className="mt-2">
                             {taskSummary}

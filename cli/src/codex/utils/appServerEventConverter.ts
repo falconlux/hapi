@@ -954,6 +954,11 @@ export class AppServerEventConverter {
                 this.lastCommandOutputDeltaByItemId.set(itemId, delta);
                 const prev = this.commandOutputBuffers.get(itemId) ?? '';
                 this.commandOutputBuffers.set(itemId, prev + delta);
+                events.push(scoped({
+                    type: 'exec_command_output_delta',
+                    call_id: itemId,
+                    delta
+                }));
             }
             return events;
         }

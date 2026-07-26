@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getHapiCommandProgress } from '@hapi/protocol';
 import { MessageQueue2 } from '@/utils/MessageQueue2';
 import type { EnhancedMode } from './loop';
 
@@ -2363,6 +2364,26 @@ describe('codexRemoteLauncher', () => {
             output: expect.objectContaining({
                 output: 'ok\n'
             })
+        }));
+    });
+
+    it('streams a throttled Codex bash output preview before completion', async () => {
+        const { session, codexMessages } = createSessionStub();
+
+        await codexRemoteLauncher(session as never);
+
+        const liveUpdates = codexMessages.filter((message) => {
+            const record = message as Record<string, unknown>;
+            return record.type === 'tool-call'
+                && record.callId === 'cmd-1'
+                && getHapiCommandProgress(record.input)?.outputTail.length;
+        }) as Array<Record<string, unknown>>;
+
+        expect(liveUpdates).toHaveLength(1);
+        expect(getHapiCommandProgress(liveUpdates[0]?.input)).toEqual(expect.objectContaining({
+            outputTail: 'ok\n',
+            outputChars: 3,
+            truncated: false
         }));
     });
 

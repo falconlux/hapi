@@ -11,6 +11,8 @@ describe('Codex system prompt', () => {
         expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('act directly with minimal analysis');
         expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('Reserve deep or exhaustive reasoning for genuinely complex work');
         expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('Escalate to deeper analysis only when evidence reveals hidden complexity');
+        expect(ADAPTIVE_REASONING_INSTRUCTION).toContain("reasoning summaries in the user's language");
+        expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('never expose hidden chain-of-thought');
     });
 
     it('combines title and adaptive-reasoning instructions for every Codex session', () => {
