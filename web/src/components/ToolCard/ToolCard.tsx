@@ -377,12 +377,7 @@ function ToolCardInner(props: ToolCardProps) {
         ? localizeCodexActivityTitle(presentation.title, locale)
         : presentation.title
     const presentationSubtitle = presentation.subtitle ?? props.block.tool.description
-    const reasoningProgressLabel = toolName === 'CodexReasoning'
-        ? props.block.tool.state === 'running'
-            ? t('tool.progress.current')
-            : t('tool.progress.summary')
-        : null
-    const subtitle = presentationSubtitle ?? reasoningProgressLabel
+    const subtitle = presentationSubtitle
     const taskSummary = renderTaskSummary(props.block, props.metadata, t)
     const subagentModel = isSubagentToolName(toolName) ? getSubagentModel(props.block.children) : null
     const runningFrom = props.block.tool.startedAt ?? props.block.tool.createdAt
@@ -435,10 +430,7 @@ function ToolCardInner(props: ToolCardProps) {
 
                 {subtitle ? (
                     <CardDescription className={cn(
-                        'text-xs text-[var(--app-tool-card-subtitle)]',
-                        reasoningProgressLabel && !presentationSubtitle
-                            ? 'font-medium text-sky-700 dark:text-sky-300'
-                            : 'font-mono',
+                        'font-mono text-xs text-[var(--app-tool-card-subtitle)]',
                         isCodexAgentCard || useCompactTerminalCard ? 'truncate whitespace-nowrap' : 'break-all'
                     )}>
                         {truncate(subtitle, 160)}

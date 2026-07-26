@@ -410,8 +410,6 @@ export default {
   'tool.trace.callsSuffix': 'calls',
   'tool.result': 'Result',
   'tool.duration': 'Duration',
-  'tool.progress.current': 'Current AI progress',
-  'tool.progress.summary': 'AI reasoning summary',
   'tool.command.running': 'Command is still running',
   'tool.command.waitingOutput': 'No output yet; new output will appear here live',
   'tool.command.liveOutput': 'Live output',
