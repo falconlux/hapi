@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { reduceTimeline } from './reducerTimeline'
 import { toolDurationMs } from '@/components/ToolCard/toolDuration'
+import { getHapiCommandProgress, withHapiCommandProgress } from '@hapi/protocol'
 import type { TracedMessage } from './tracer'
 
 function makeContext() {
@@ -363,6 +364,58 @@ describe('reduceTimeline', () => {
         const toolBlock = blocks.find(b => b.kind === 'tool-call') as any
         expect(toolBlock).toBeDefined()
         expect(toolBlock.invokedAt).toBe(1_700_000_000_500)
+    })
+
+    it('merges repeated CodexBash tool calls into one running card with the latest live output', () => {
+        const initial: TracedMessage = {
+            id: 'msg-call',
+            localId: null,
+            createdAt: 1_700_000_000_000,
+            role: 'agent',
+            content: [{
+                type: 'tool-call',
+                id: 'cmd-live',
+                name: 'CodexBash',
+                input: withHapiCommandProgress({ command: 'bun test' }, {
+                    status: 'running',
+                    outputTail: '',
+                    outputChars: 0,
+                    truncated: false
+                }),
+                description: null,
+                uuid: 'u-1',
+                parentUUID: null
+            }],
+            isSidechain: false
+        } as TracedMessage
+        const update: TracedMessage = {
+            ...initial,
+            id: 'msg-update',
+            createdAt: 1_700_000_001_000,
+            content: [{
+                type: 'tool-call',
+                id: 'cmd-live',
+                name: 'CodexBash',
+                input: withHapiCommandProgress({ command: 'bun test' }, {
+                    status: 'running',
+                    outputTail: '42 tests passed\n',
+                    outputChars: 16,
+                    truncated: false
+                }),
+                description: null,
+                uuid: 'u-2',
+                parentUUID: null
+            }]
+        } as TracedMessage
+
+        const { blocks } = reduceTimeline([initial, update], makeContext())
+        const tools = blocks.filter((block) => block.kind === 'tool-call')
+
+        expect(tools).toHaveLength(1)
+        expect(tools[0]?.kind).toBe('tool-call')
+        if (tools[0]?.kind !== 'tool-call') return
+        expect(tools[0].tool.state).toBe('running')
+        expect(getHapiCommandProgress(tools[0].tool.input)?.outputTail).toBe('42 tests passed\n')
     })
 
     describe('exec-timestamp (Claude entry clock) tool duration source', () => {

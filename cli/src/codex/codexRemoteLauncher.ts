@@ -14,6 +14,7 @@ import type { CodexSession } from './session';
 import type { EnhancedMode } from './loop';
 import { hasCodexCliOverrides } from './utils/codexCliOverrides';
 import { AppServerEventConverter } from './utils/appServerEventConverter';
+import { CommandProgressTracker } from './utils/commandProgressTracker';
 import { detectImageMimeType, registerGeneratedImage } from '@/modules/common/generatedImages';
 import { registerAppServerPermissionHandlers } from './utils/appServerPermissionAdapter';
 import { buildThreadStartParams, buildTurnStartParams } from './utils/appServerConfig';
@@ -61,6 +62,7 @@ type QueuedMessage = { message: string; mode: EnhancedMode; isolate: boolean; ha
 type ChildAgentRuntime = {
     reasoningProcessor: ReasoningProcessor;
     diffProcessor: DiffProcessor;
+    commandProgress: CommandProgressTracker;
     activeToolsByCallId: Map<string, {
         name: string;
         label: string;
@@ -645,6 +647,15 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
         const diffProcessor = new DiffProcessor((message) => {
             session.sendAgentMessage(message);
         });
+        const parentCommandProgress = new CommandProgressTracker((callId, input) => {
+            session.sendAgentMessage({
+                type: 'tool-call',
+                name: 'CodexBash',
+                callId,
+                input,
+                id: randomUUID()
+            });
+        });
         const mcpTitleByCallId = new Map<string, string>();
         const agentCardByAgentId = new Map<string, string>();
         const agentSummaryByCardId = new Map<string, string>();
@@ -913,6 +924,12 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             pendingThrottledAgentUpdateByAgentId.clear();
         };
 
+        const resetAllChildCommandProgress = (): void => {
+            for (const runtime of childAgentRuntimeById.values()) {
+                runtime.commandProgress.reset();
+            }
+        };
+
         const flushPendingThrottledAgentRunUpdate = (agentId: string): void => {
             const pendingUpdate = pendingThrottledAgentUpdateByAgentId.get(agentId);
             pendingThrottledAgentUpdateTimerByAgentId.delete(agentId);
@@ -1146,6 +1163,15 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 }),
                 diffProcessor: new DiffProcessor((message) => {
                     emitAgentRunTraceMessage(agentId, message);
+                }),
+                commandProgress: new CommandProgressTracker((callId, input) => {
+                    emitAgentRunTraceMessage(agentId, {
+                        type: 'tool-call',
+                        name: 'CodexBash',
+                        callId,
+                        input,
+                        id: randomUUID()
+                    });
                 }),
                 activeToolsByCallId: new Map(),
                 pendingTitleByCallId: new Map(),
@@ -1537,11 +1563,12 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                     delete inputs.type;
                     delete inputs.call_id;
                     delete inputs.callId;
+                    const liveInput = runtime.commandProgress.start(callId, inputs);
                     emitAgentRunTraceMessage(agentId, {
                         type: 'tool-call',
                         name: 'CodexBash',
                         callId,
-                        input: inputs,
+                        input: liveInput,
                         id: randomUUID()
                     });
                     const command = normalizeCommand(inputs.command) ?? 'command';
@@ -1562,9 +1589,22 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 }
                 return;
             }
+            if (msgType === 'exec_command_output_delta') {
+                const callId = asString(msg.call_id ?? msg.callId);
+                const delta = asString(msg.delta);
+                if (callId && delta) {
+                    runtime.commandProgress.append(callId, delta);
+                    updateActivity(
+                        formatActivity('Command output', previewText(delta)),
+                        'running-command'
+                    );
+                }
+                return;
+            }
             if (msgType === 'exec_command_end') {
                 const callId = asString(msg.call_id ?? msg.callId);
                 if (callId) {
+                    runtime.commandProgress.finish(callId);
                     const activeTool = runtime.activeToolsByCallId.get(callId);
                     runtime.activeToolsByCallId.delete(callId);
                     const output: Record<string, unknown> = { ...msg };
@@ -1783,6 +1823,7 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 runtime.terminal = true;
                 runtime.reasoningProcessor.reset();
                 runtime.diffProcessor.reset();
+                runtime.commandProgress.reset();
                 runtime.activeToolsByCallId.clear();
                 runtime.pendingTitleByCallId.clear();
                 runtime.reasoningPreview = '';
@@ -2732,6 +2773,7 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 }
                 diffProcessor.reset();
                 appServerEventConverter.reset();
+                parentCommandProgress.reset();
                 mcpTitleByCallId.clear();
                 pendingAgentToolInputByCallId.clear();
                 childAgentActivityInCurrentTurn = false;
@@ -2816,19 +2858,28 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                     delete inputs.type;
                     delete inputs.call_id;
                     delete inputs.callId;
+                    const liveInput = parentCommandProgress.start(callId, inputs);
 
                     session.sendAgentMessage({
                         type: 'tool-call',
                         name: 'CodexBash',
                         callId: callId,
-                        input: inputs,
+                        input: liveInput,
                         id: randomUUID()
                     });
+                }
+            }
+            if (msgType === 'exec_command_output_delta') {
+                const callId = asString(msg.call_id ?? msg.callId);
+                const delta = asString(msg.delta);
+                if (callId && delta) {
+                    parentCommandProgress.append(callId, delta);
                 }
             }
             if (msgType === 'exec_command_end') {
                 const callId = asString(msg.call_id ?? msg.callId);
                 if (callId) {
+                    parentCommandProgress.finish(callId);
                     const output: Record<string, unknown> = { ...msg };
                     delete output.type;
                     delete output.call_id;
@@ -3748,10 +3799,12 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                     reasoningProcessor.abort();
                     diffProcessor.reset();
                     appServerEventConverter.reset();
+                    parentCommandProgress.reset();
                     mcpTitleByCallId.clear();
                     pendingAgentToolInputByCallId.clear();
                     pendingAgentTracesByAgentId.clear();
                     cancelAllPendingThrottledAgentRunUpdates();
+                    resetAllChildCommandProgress();
                     childAgentRuntimeById.clear();
                     session.onThinkingChange(false);
                     clearReadyAfterTurnTimer?.();
@@ -3775,6 +3828,8 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
         clearDeferredThreadStatusFailure();
         cancelSafetyBufferingRequest('Session ended');
         cancelAllPendingThrottledAgentRunUpdates();
+        resetAllChildCommandProgress();
+        parentCommandProgress.reset();
     }
 
     protected async cleanup(): Promise<void> {
