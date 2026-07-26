@@ -54,6 +54,8 @@ describe('localizeCodexActivityTitle', () => {
             .toBe('正在规划：守护进程重启和标签页重新打开')
         expect(localizeCodexActivityTitle('Mapping infrastructure translation terms', 'zh-CN'))
             .toBe('正在整理：基础设施翻译词汇')
+        expect(localizeCodexActivityTitle('Verifying deployed activity mapping terms', 'zh-CN'))
+            .toBe('正在验证：已部署操作映射词汇')
         expect(localizeCodexActivityTitle('正在检查：current session state', 'zh-CN'))
             .toBe('正在检查：当前会话状态')
     })
