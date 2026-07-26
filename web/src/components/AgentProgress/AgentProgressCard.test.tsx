@@ -1,7 +1,8 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChatBlock, ToolCallBlock } from '@/chat/types'
-import { AgentProgressCard, localizeAgentPhase } from '@/components/AgentProgress/AgentProgressCard'
+import { AgentProgressCard } from '@/components/AgentProgress/AgentProgressCard'
+import { localizeCodexActivityTitle } from '@/lib/codexActivityTitle'
 import { I18nProvider } from '@/lib/i18n-context'
 
 function tool(
@@ -31,17 +32,19 @@ function tool(
     }
 }
 
-describe('localizeAgentPhase', () => {
+describe('localizeCodexActivityTitle', () => {
     it('turns common English Codex activity headings into Chinese action labels', () => {
-        expect(localizeAgentPhase('Planning canvas mouse event dispatch', 'zh-CN'))
+        expect(localizeCodexActivityTitle('Planning canvas mouse event dispatch', 'zh-CN'))
             .toBe('正在规划：canvas mouse event dispatch')
-        expect(localizeAgentPhase('Debugging grid child indexing', 'zh-CN'))
+        expect(localizeCodexActivityTitle('Debugging grid child indexing', 'zh-CN'))
             .toBe('正在排查：grid child indexing')
+        expect(localizeCodexActivityTitle('Marking missing README step completed', 'zh-CN'))
+            .toBe('正在处理：missing README step completed')
     })
 
     it('keeps Chinese and English-locale titles unchanged', () => {
-        expect(localizeAgentPhase('正在发布游戏', 'zh-CN')).toBe('正在发布游戏')
-        expect(localizeAgentPhase('Planning release', 'en')).toBe('Planning release')
+        expect(localizeCodexActivityTitle('正在发布游戏', 'zh-CN')).toBe('正在发布游戏')
+        expect(localizeCodexActivityTitle('Planning release', 'en')).toBe('Planning release')
     })
 })
 

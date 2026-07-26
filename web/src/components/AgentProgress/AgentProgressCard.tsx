@@ -5,33 +5,10 @@ import { getToolGroupActionKind } from '@/chat/toolGroups'
 import { getToolPresentation } from '@/components/ToolCard/knownTools'
 import type { SessionMetadataSummary } from '@/types/api'
 import { getInputStringAny, truncate } from '@/lib/toolInputUtils'
-import { useTranslation, type Locale } from '@/lib/use-translation'
+import { localizeCodexActivityTitle } from '@/lib/codexActivityTitle'
+import { useTranslation } from '@/lib/use-translation'
 
 type Translator = (key: string, params?: Record<string, string | number>) => string
-
-const PHASE_VERBS_ZH: Array<[RegExp, string]> = [
-    [/^(?:Checking|Inspecting|Reviewing|Reading)\s+/i, '正在检查：'],
-    [/^(?:Diagnosing|Debugging|Investigating|Tracing)\s+/i, '正在排查：'],
-    [/^(?:Planning|Designing)\s+/i, '正在规划：'],
-    [/^(?:Testing|Verifying|Validating)\s+/i, '正在验证：'],
-    [/^(?:Implementing|Adding|Creating|Building)\s+/i, '正在实现：'],
-    [/^(?:Updating|Changing|Adjusting|Refactoring|Simplifying)\s+/i, '正在修改：'],
-    [/^(?:Running|Executing)\s+/i, '正在执行：'],
-    [/^(?:Capturing|Taking)\s+/i, '正在获取：'],
-    [/^(?:Selecting|Choosing)\s+/i, '正在选择：'],
-    [/^(?:Closing|Opening|Claiming)\s+/i, '正在处理：'],
-    [/^(?:Deploying|Publishing|Releasing)\s+/i, '正在发布：'],
-]
-
-export function localizeAgentPhase(value: string, locale: Locale): string {
-    if (locale !== 'zh-CN' || /[\u3400-\u9fff]/.test(value)) return value
-    for (const [pattern, prefix] of PHASE_VERBS_ZH) {
-        if (pattern.test(value)) {
-            return `${prefix}${value.replace(pattern, '')}`
-        }
-    }
-    return value
-}
 
 function getCommandText(block: ToolCallBlock): string | null {
     const direct = getInputStringAny(block.tool.input, ['command', 'cmd'])
@@ -106,8 +83,8 @@ export function AgentProgressCard(props: {
     if (!props.isRunning) return null
 
     const primaryProgress = progress.progressMessage ?? progress.phase ?? t('agentProgress.preparing')
-    const localizedPrimary = localizeAgentPhase(primaryProgress, locale)
-    const localizedPhase = progress.phase ? localizeAgentPhase(progress.phase, locale) : null
+    const localizedPrimary = localizeCodexActivityTitle(primaryProgress, locale)
+    const localizedPhase = progress.phase ? localizeCodexActivityTitle(progress.phase, locale) : null
     const showSeparatePhase = Boolean(
         progress.progressMessage
         && localizedPhase
