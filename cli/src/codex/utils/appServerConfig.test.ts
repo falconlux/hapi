@@ -303,7 +303,7 @@ describe('appServerConfig', () => {
         });
         expect(params.sandboxPolicy).toEqual({ type: 'readOnly' });
         expect(params.effort).toBe('high');
-        expect(params.summary).toBeUndefined();
+        expect(params.summary).toBe('detailed');
         expect(params.collaborationMode).toEqual({
             mode: 'default',
             settings: {
@@ -397,6 +397,24 @@ describe('appServerConfig', () => {
         expect(params.summary).toBe('detailed');
         expect(params.model).toBe('o3');
         expect(params.collaborationMode).toBeUndefined();
+    });
+
+    it('keeps reasoning summary for collaboration turns on supported models', () => {
+        const params = buildTurnStartParams({
+            threadId: 'thread-1',
+            message: 'hello',
+            cwd: '/workspace/project',
+            mode: {
+                permissionMode: 'default',
+                model: 'gpt-5.6-sol',
+                modelReasoningEffort: 'max',
+                collaborationMode: 'default'
+            }
+        });
+
+        expect(params.effort).toBe('max');
+        expect(params.summary).toBe('detailed');
+        expect(params.collaborationMode?.settings.model).toBe('gpt-5.6-sol');
     });
 
     it('puts collaboration mode in turn params with model settings', () => {
