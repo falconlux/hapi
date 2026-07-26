@@ -415,6 +415,8 @@ export default {
   'tool.command.liveOutput': 'Live output',
   'tool.command.truncated': 'Showing the latest output only',
   'agentProgress.running': 'Codex is working',
+  'agentProgress.collapse': 'Collapse execution progress',
+  'agentProgress.expand': 'Expand execution progress',
   'agentProgress.preparing': 'Analyzing the latest result and preparing the next step',
   'agentProgress.phase': 'Current phase',
   'agentProgress.action': 'Action',

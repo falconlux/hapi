@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChatBlock, ToolCallBlock } from '@/chat/types'
 import { AgentProgressCard } from '@/components/AgentProgress/AgentProgressCard'
@@ -89,5 +89,33 @@ describe('AgentProgressCard', () => {
         expect(screen.getByText('正在浏览器中操作并检查应用')).toBeInTheDocument()
         expect(screen.getByText('重构并发布猫咪数独')).toBeInTheDocument()
         expect(screen.getByText('已完成 1 个阶段 · 1 项操作')).toBeInTheDocument()
+    })
+
+    it('collapses the persistent card and remembers the preference', () => {
+        const blocks: ChatBlock[] = [
+            { kind: 'user-text', id: 'u1', localId: null, createdAt: 1, text: '发布修复' },
+            tool('r1', 'CodexReasoning', { title: 'Deploying progress UI' }),
+        ]
+
+        render(
+            <I18nProvider>
+                <AgentProgressCard
+                    blocks={blocks}
+                    fallbackObjective="发布修复"
+                    isRunning
+                    metadata={null}
+                />
+            </I18nProvider>,
+        )
+
+        const collapse = screen.getByRole('button', { name: '收起执行进度' })
+        expect(collapse).toHaveAttribute('aria-expanded', 'true')
+        expect(screen.getByText('正在发布：progress UI')).toBeInTheDocument()
+
+        fireEvent.click(collapse)
+
+        expect(screen.getByRole('button', { name: '展开执行进度' })).toHaveAttribute('aria-expanded', 'false')
+        expect(screen.queryByText('正在发布：progress UI')).not.toBeInTheDocument()
+        expect(window.localStorage.setItem).toHaveBeenCalledWith('hapi-agent-progress-collapsed', '1')
     })
 })

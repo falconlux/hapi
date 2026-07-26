@@ -419,6 +419,8 @@ export default {
   'tool.command.liveOutput': '实时输出',
   'tool.command.truncated': '仅显示最近输出',
   'agentProgress.running': 'Codex 正在执行',
+  'agentProgress.collapse': '收起执行进度',
+  'agentProgress.expand': '展开执行进度',
   'agentProgress.preparing': '正在分析最新结果并准备下一步',
   'agentProgress.phase': '当前阶段',
   'agentProgress.action': '当前操作',
