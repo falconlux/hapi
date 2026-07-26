@@ -815,6 +815,7 @@ export default {
   'misc.typeAMessage': 'Type a message...',
   'misc.offline': 'offline',
   'misc.permissionRequired': 'permission required',
+  'misc.working': 'working…',
   'misc.percentLeft': '{percent}% left',
   'misc.online': 'online',
 
