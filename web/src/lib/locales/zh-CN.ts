@@ -500,8 +500,6 @@ export default {
   'tool.duration': '耗时',
   'tool.startedAt': '开始',
   'tool.completedAt': '结束',
-  'tool.progress.current': 'AI 当前进度',
-  'tool.progress.summary': 'AI 思考摘要',
   'tool.command.running': '命令仍在运行',
   'tool.command.waitingOutput': '暂时没有输出；有新内容时会实时显示',
   'tool.command.liveOutput': '实时输出',
