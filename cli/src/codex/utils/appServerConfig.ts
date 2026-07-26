@@ -219,7 +219,7 @@ export function buildTurnStartParams(args: {
 
     if (modelReasoningEffort) {
         params.effort = modelReasoningEffort;
-        if (!collaborationMode && supportsReasoningSummary(model)) {
+        if (supportsReasoningSummary(model)) {
             params.summary = 'detailed';
         }
     }
