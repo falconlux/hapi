@@ -32,12 +32,27 @@ export const TITLE_INSTRUCTION = trimIdent(`
 `);
 
 /**
+ * Keep routine work fast while still allowing thorough analysis when the task
+ * genuinely needs it. This guides behavior independently of the model's
+ * configured reasoning-effort setting.
+ */
+export const ADAPTIVE_REASONING_INSTRUCTION = trimIdent(`
+    Match the depth of reasoning to the task's actual complexity.
+    For simple, local, or routine requests, act directly with minimal analysis. Do not create a plan, broadly explore the repository, or delegate work unless it materially helps. Use the fewest tool calls needed to complete the task safely.
+    Reserve deep or exhaustive reasoning for genuinely complex work, including ambiguous multi-step problems, architecture or design tradeoffs, difficult debugging, security-sensitive or destructive changes, migrations, and requests that explicitly ask for thorough analysis.
+    Start with the lightest adequate approach. Escalate to deeper analysis only when evidence reveals hidden complexity, the first straightforward attempt fails, or the risk of a wrong answer is high.
+    Keep user-facing explanations proportional to the task and report conclusions rather than private chain-of-thought.
+`);
+
+/**
  * The system prompt to inject via developer_instructions in local mode.
  * Session-summary contract is resolved at call time (hub toggle / env).
  */
+const BASE_CODEX_SYSTEM_PROMPT = `${TITLE_INSTRUCTION}\n\n${ADAPTIVE_REASONING_INSTRUCTION}`
+
 export function getCodexSystemPrompt(env: NodeJS.ProcessEnv = process.env): string {
-    return withSessionSummaryInstruction(TITLE_INSTRUCTION, env)
+    return withSessionSummaryInstruction(BASE_CODEX_SYSTEM_PROMPT, env)
 }
 
 /** Alias kept for existing call sites / tests that expect a string constant name. */
-export const codexSystemPrompt = TITLE_INSTRUCTION
+export const codexSystemPrompt = BASE_CODEX_SYSTEM_PROMPT
