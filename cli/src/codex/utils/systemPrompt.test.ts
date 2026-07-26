@@ -11,8 +11,12 @@ describe('Codex system prompt', () => {
         expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('act directly with minimal analysis');
         expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('Reserve deep or exhaustive reasoning for genuinely complex work');
         expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('Escalate to deeper analysis only when evidence reveals hidden complexity');
-        expect(ADAPTIVE_REASONING_INSTRUCTION).toContain("reasoning summaries in the user's language");
+        expect(ADAPTIVE_REASONING_INSTRUCTION).toContain("reasoning-summary titles in the language of the user's latest message");
         expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('never expose hidden chain-of-thought');
+        expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('more than 20 seconds or 3 tool calls');
+        expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('after at most 5 tool calls or 60 seconds');
+        expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('maintain a concise 3-6 step plan with update_plan');
+        expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('Do not fall back to English when the user is writing in Chinese');
     });
 
     it('combines title and adaptive-reasoning instructions for every Codex session', () => {

@@ -67,8 +67,9 @@ export default defineConfig({
     plugins: [
         react(),
         VitePWA({
-            // User-controlled reload avoids mid-session surprise reloads (autoUpdate reloads all tabs).
-            registerType: 'prompt',
+            // Keep installed mobile PWAs on the same build as the hub. Agent
+            // work continues server-side across the brief page reload.
+            registerType: 'autoUpdate',
             includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'mask-icon.svg'],
             strategies: 'injectManifest',
             srcDir: 'src',

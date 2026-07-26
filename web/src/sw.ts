@@ -31,6 +31,13 @@ type PushPayload = {
 
 precacheAndRoute(self.__WB_MANIFEST)
 
+// Activate every production build immediately. Without this, an installed
+// Android PWA can keep the previous worker (and therefore the previous UI)
+// waiting indefinitely even after the app is closed and reopened.
+self.addEventListener('install', (event) => {
+    event.waitUntil(self.skipWaiting())
+})
+
 registerRoute(
     ({ url }) => url.pathname === '/api/sessions',
     new NetworkFirst({
@@ -106,7 +113,22 @@ self.addEventListener('message', (event) => {
 })
 
 self.addEventListener('activate', (event) => {
-    event.waitUntil(self.clients.claim())
+    event.waitUntil((async () => {
+        await self.clients.claim()
+
+        // Existing pages keep their already-evaluated JavaScript after a
+        // controller swap. Navigate them once so users immediately see the
+        // new progress UI instead of unknowingly staying on a stale bundle.
+        const clients = await self.clients.matchAll({ type: 'window' })
+        await Promise.all(clients.map(async (client) => {
+            if (!('navigate' in client) || typeof client.navigate !== 'function') return
+            try {
+                await client.navigate(client.url)
+            } catch {
+                // A closing/backgrounded window can disappear during update.
+            }
+        }))
+    })())
 })
 
 self.addEventListener('push', (event) => {
