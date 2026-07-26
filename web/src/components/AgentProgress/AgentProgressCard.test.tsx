@@ -33,17 +33,29 @@ function tool(
 }
 
 describe('localizeCodexActivityTitle', () => {
-    it('turns common English Codex activity headings into Chinese action labels', () => {
+    it('localizes both the action and common engineering details', () => {
         expect(localizeCodexActivityTitle('Planning canvas mouse event dispatch', 'zh-CN'))
-            .toBe('正在规划：canvas mouse event dispatch')
+            .toBe('正在规划：画布鼠标事件分发')
         expect(localizeCodexActivityTitle('Debugging grid child indexing', 'zh-CN'))
-            .toBe('正在排查：grid child indexing')
+            .toBe('正在排查：网格子项索引')
         expect(localizeCodexActivityTitle('Marking missing README step completed', 'zh-CN'))
-            .toBe('正在处理：missing README step completed')
+            .toBe('正在处理：缺失的 README 步骤已完成')
+        expect(localizeCodexActivityTitle('Requesting evaluation card text', 'zh-CN'))
+            .toBe('正在获取：验收卡片文字')
+        expect(localizeCodexActivityTitle('Executing browser verification and type checks', 'zh-CN'))
+            .toBe('正在执行：浏览器验收和类型检查')
+        expect(localizeCodexActivityTitle('Building production bundle', 'zh-CN'))
+            .toBe('正在构建：生产环境资源包')
+        expect(localizeCodexActivityTitle('正在检查：current session state', 'zh-CN'))
+            .toBe('正在检查：当前会话状态')
     })
 
-    it('keeps Chinese and English-locale titles unchanged', () => {
+    it('keeps code identifiers and English-locale titles unchanged', () => {
         expect(localizeCodexActivityTitle('正在发布游戏', 'zh-CN')).toBe('正在发布游戏')
+        expect(localizeCodexActivityTitle('Inspecting web/src/AgentProgressCard.tsx', 'zh-CN'))
+            .toBe('正在检查：web/src/AgentProgressCard.tsx')
+        expect(localizeCodexActivityTitle('Running bun run build:web', 'zh-CN'))
+            .toBe('正在执行：bun run build:web')
         expect(localizeCodexActivityTitle('Planning release', 'en')).toBe('Planning release')
     })
 })
@@ -85,7 +97,7 @@ describe('AgentProgressCard', () => {
         )
 
         expect(screen.getByText('Codex 正在执行')).toBeInTheDocument()
-        expect(screen.getByText('正在规划：canvas mouse event dispatch')).toBeInTheDocument()
+        expect(screen.getByText('正在规划：画布鼠标事件分发')).toBeInTheDocument()
         expect(screen.getByText('正在浏览器中操作并检查应用')).toBeInTheDocument()
         expect(screen.getByText('重构并发布猫咪数独')).toBeInTheDocument()
         expect(screen.getByText('已完成 1 个阶段 · 1 项操作')).toBeInTheDocument()
@@ -110,12 +122,12 @@ describe('AgentProgressCard', () => {
 
         const collapse = screen.getByRole('button', { name: '收起执行进度' })
         expect(collapse).toHaveAttribute('aria-expanded', 'true')
-        expect(screen.getByText('正在发布：progress UI')).toBeInTheDocument()
+        expect(screen.getByText('正在发布：进度界面')).toBeInTheDocument()
 
         fireEvent.click(collapse)
 
         expect(screen.getByRole('button', { name: '展开执行进度' })).toHaveAttribute('aria-expanded', 'false')
-        expect(screen.queryByText('正在发布：progress UI')).not.toBeInTheDocument()
+        expect(screen.queryByText('正在发布：进度界面')).not.toBeInTheDocument()
         expect(window.localStorage.setItem).toHaveBeenCalledWith('hapi-agent-progress-collapsed', '1')
     })
 })
