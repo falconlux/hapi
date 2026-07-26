@@ -50,6 +50,8 @@ describe('localizeCodexActivityTitle', () => {
             .toBe('正在刷新：标签页 a83a 用于资源包检查')
         expect(localizeCodexActivityTitle('Verifying actual card refresh', 'zh-CN'))
             .toBe('正在验证：实际卡片刷新')
+        expect(localizeCodexActivityTitle('Planning daemon restart and tab reopen', 'zh-CN'))
+            .toBe('正在规划：守护进程重启和标签页重新打开')
         expect(localizeCodexActivityTitle('正在检查：current session state', 'zh-CN'))
             .toBe('正在检查：当前会话状态')
     })
