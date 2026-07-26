@@ -23,6 +23,7 @@ import { usePointerFocusRing } from '@/hooks/usePointerFocusRing'
 import { getInputStringAny, truncate } from '@/lib/toolInputUtils'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/use-translation'
+import { localizeCodexActivityTitle } from '@/lib/codexActivityTitle'
 import { TraceSection } from '@/components/ToolCard/trace'
 import { isSubagentToolName } from '@/chat/subagentTool'
 import { formatLiveCommandOutput, getLiveCommandProgress } from '@/components/ToolCard/commandProgress'
@@ -444,7 +445,7 @@ export function ToolDetailDialogContent(props: {
 }
 
 function ToolCardInner(props: ToolCardProps) {
-    const { t } = useTranslation()
+    const { t, locale } = useTranslation()
     const [detailsOpen, setDetailsOpen] = useState(false)
     const presentation = useMemo(() => getToolPresentation({
         toolName: props.block.tool.name,
@@ -465,7 +466,9 @@ function ToolCardInner(props: ToolCardProps) {
     ])
 
     const toolName = props.block.tool.name
-    const toolTitle = presentation.title
+    const toolTitle = props.block.tool.name === 'CodexReasoning'
+        ? localizeCodexActivityTitle(presentation.title, locale)
+        : presentation.title
     const presentationSubtitle = presentation.subtitle ?? props.block.tool.description
     const reasoningProgressLabel = toolName === 'CodexReasoning'
         ? props.block.tool.state === 'running'

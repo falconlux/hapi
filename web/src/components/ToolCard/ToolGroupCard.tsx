@@ -194,7 +194,7 @@ export function ToolGroupCard(props: {
     block: ToolGroupBlock
     metadata: SessionMetadataSummary | null
 }) {
-    const { t } = useTranslation()
+    const { t, locale } = useTranslation()
     const ctx = useHappyChatContext()
     const [open, setOpen] = useState(props.block.defaultOpen)
     const [selectedToolId, setSelectedToolId] = useState<string | null>(null)
@@ -289,7 +289,7 @@ export function ToolGroupCard(props: {
         }, t)
     }, [selectedTool, props.metadata, t])
 
-    const primaryTitle = formatGroupedHeaderTitle(props.block, t)
+    const primaryTitle = formatGroupedHeaderTitle(props.block, t, locale)
     const meta = props.block.presentationMode === 'codex-exploration'
         ? null
         : getGroupedHeaderMeta(props.block, t, props.metadata)

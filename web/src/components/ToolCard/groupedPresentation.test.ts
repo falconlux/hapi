@@ -144,6 +144,16 @@ describe('formatGroupedHeaderTitle', () => {
         expect(formatGroupedHeaderTitle(group, tEn)).toBe('Inspecting the authentication flow')
     })
 
+    it('replaces an English Codex heading with a concrete Chinese tool action', () => {
+        const group = makeGroup([
+            makeTool('read-activity-zh-1', 'Read', { file_path: 'auth.ts' }),
+            makeTool('read-activity-zh-2', 'Read', { file_path: 'session.ts' }),
+        ])
+        group.activityTitle = 'Reviewing the authentication flow'
+
+        expect(formatGroupedHeaderTitle(group, tZh, 'zh-CN')).toBe('检查 auth.ts')
+    })
+
     it('replaces a generic Codex activity heading with a concrete target', () => {
         const group = makeGroup([
             makeTool('read-generic-activity-1', 'shell_command', {

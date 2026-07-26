@@ -3,6 +3,8 @@ import type { ToolCallBlock } from '@/chat/types'
 import { isCodexExplorationTool } from '@/chat/codexCommandPresentation'
 import type { SessionMetadataSummary } from '@/types/api'
 import { isObject } from '@hapi/protocol'
+import { isEnglishCodexActivityTitle, localizeCodexActivityTitle } from '@/lib/codexActivityTitle'
+import type { Locale } from '@/lib/i18n-context'
 import { getInputStringAny } from '@/lib/toolInputUtils'
 import { basename, resolveDisplayPath } from '@/utils/path'
 
@@ -528,7 +530,11 @@ function formatMixedMutationTitle(block: ToolGroupBlock, t: Translator): string 
     return t(includesInspection ? 'toolGroup.friendly.inspectAndEdit' : 'toolGroup.friendly.editFiles')
 }
 
-export function formatGroupedHeaderTitle(block: ToolGroupBlock, t: Translator): string {
+export function formatGroupedHeaderTitle(
+    block: ToolGroupBlock,
+    t: Translator,
+    locale: Locale = 'en',
+): string {
     if (block.presentationMode === 'codex-exploration') {
         return block.tools.some((tool) => tool.tool.state === 'running' || tool.tool.state === 'pending')
             ? t('toolGroup.codex.exploring')
@@ -538,10 +544,18 @@ export function formatGroupedHeaderTitle(block: ToolGroupBlock, t: Translator): 
     const activityTitle = safeLabelValue(block.activityTitle ?? null)
     const mixedMutationTitle = formatMixedMutationTitle(block, t)
     if (mixedMutationTitle) return mixedMutationTitle
-    if (activityTitle && !isGenericActivityTitle(activityTitle, t)) return activityTitle
     const specificTitle = formatSpecificIntentTitle(block, primaryIntent, t)
+    if (activityTitle && !isGenericActivityTitle(activityTitle, t)) {
+        // Codex generates these headings independently from the model prompt,
+        // so Chinese sessions can still receive English titles. Prefer the
+        // concrete translated tool intent; use verb localization as fallback.
+        if (isEnglishCodexActivityTitle(activityTitle, locale)) {
+            return specificTitle ?? localizeCodexActivityTitle(activityTitle, locale)
+        }
+        return activityTitle
+    }
     if (specificTitle) return specificTitle
-    if (activityTitle) return activityTitle
+    if (activityTitle) return localizeCodexActivityTitle(activityTitle, locale)
     if (primaryIntent === 'generic-tool') {
         return t('toolGroup.title')
     }
