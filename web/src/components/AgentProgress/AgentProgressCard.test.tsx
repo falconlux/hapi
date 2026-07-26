@@ -48,6 +48,8 @@ describe('localizeCodexActivityTitle', () => {
             .toBe('正在构建：生产环境资源包')
         expect(localizeCodexActivityTitle('Reloading tab a83a for bundle inspection', 'zh-CN'))
             .toBe('正在刷新：标签页 a83a 用于资源包检查')
+        expect(localizeCodexActivityTitle('Verifying actual card refresh', 'zh-CN'))
+            .toBe('正在验证：实际卡片刷新')
         expect(localizeCodexActivityTitle('正在检查：current session state', 'zh-CN'))
             .toBe('正在检查：当前会话状态')
     })
