@@ -42,7 +42,11 @@ export const ADAPTIVE_REASONING_INSTRUCTION = trimIdent(`
     Reserve deep or exhaustive reasoning for genuinely complex work, including ambiguous multi-step problems, architecture or design tradeoffs, difficult debugging, security-sensitive or destructive changes, migrations, and requests that explicitly ask for thorough analysis.
     Start with the lightest adequate approach. Escalate to deeper analysis only when evidence reveals hidden complexity, the first straightforward attempt fails, or the risk of a wrong answer is high.
     Keep user-facing explanations proportional to the task and report conclusions rather than private chain-of-thought.
-    Write user-visible progress updates and reasoning summaries in the user's language. Keep them concise and never expose hidden chain-of-thought.
+    Write all user-visible progress updates and reasoning-summary titles in the language of the user's latest message. Do not fall back to English when the user is writing in Chinese. Keep them concise and never expose hidden chain-of-thought.
+    For work likely to take more than 20 seconds or 3 tool calls, send a short user-facing progress update before the first tool call: state the goal and the immediate next action.
+    At each material phase change, or after at most 5 tool calls or 60 seconds without an update, send one short checkpoint in the user's language: what finished and what is happening now.
+    For sustained multi-step work, maintain a concise 3-6 step plan with update_plan and keep exactly one step in_progress until the work is complete.
+    Progress updates are high-level operational summaries, not private reasoning. Do not narrate every minor command.
 `);
 
 /**

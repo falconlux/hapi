@@ -120,6 +120,23 @@ describe('isEligibleForToolGrouping', () => {
         }))).toBe(true)
     })
 
+    it('keeps running work standalone so live output stays visible', () => {
+        expect(isEligibleForToolGrouping(makeToolBlock('running-1', 'CodexBash', {}, {
+            tool: {
+                id: 'running-1',
+                name: 'CodexBash',
+                state: 'running',
+                input: { command: 'bun test' },
+                createdAt: 1,
+                startedAt: 1,
+                completedAt: null,
+                execStartedAt: null,
+                execCompletedAt: null,
+                description: null,
+            }
+        }))).toBe(false)
+    })
+
     it('keeps Codex permission milestones standalone after completion', () => {
         expect(isEligibleForToolGrouping(makeToolBlock('codex-perm-1', 'CodexPermission', {}, {
             tool: {
@@ -151,9 +168,43 @@ describe('Codex activity headings', () => {
             makeToolBlock('read-2', 'Read', { file_path: 'session.ts' }),
         ], { hasMoreMessages: false })
 
-        expect(visible).toHaveLength(2)
-        expect(isToolGroupBlock(visible[1])).toBe(true)
-        expect(isToolGroupBlock(visible[1]) ? visible[1].activityTitle : null).toBe('Inspecting authentication')
+        expect(visible).toHaveLength(1)
+        expect(isToolGroupBlock(visible[0])).toBe(true)
+        expect(isToolGroupBlock(visible[0]) ? visible[0].activityTitle : null).toBe('Inspecting authentication')
+    })
+
+    it('folds one completed operation into its reasoning phase', () => {
+        const visible = buildVisibleChatBlocks([
+            makeToolBlock('reasoning-1', 'CodexReasoning', { title: 'Checking screenshot size' }),
+            makeToolBlock('read-1', 'Read', { file_path: 'shot.png' }),
+        ], { hasMoreMessages: false })
+
+        expect(visible).toHaveLength(1)
+        expect(isToolGroupBlock(visible[0])).toBe(true)
+        if (!isToolGroupBlock(visible[0])) throw new Error('expected phase group')
+        expect(visible[0].activityTitle).toBe('Checking screenshot size')
+        expect(visible[0].tools.map((tool) => tool.id)).toEqual(['read-1'])
+    })
+
+    it('does not hide a running operation inside its completed reasoning phase', () => {
+        const running = makeToolBlock('bash-1', 'CodexBash', { command: 'bun test' }, {
+            tool: {
+                id: 'bash-1',
+                name: 'CodexBash',
+                state: 'running',
+                input: { command: 'bun test' },
+                createdAt: 1,
+                startedAt: 1,
+                completedAt: null,
+                execStartedAt: null,
+                execCompletedAt: null,
+                description: null,
+            }
+        })
+        const reasoning = makeToolBlock('reasoning-1', 'CodexReasoning', { title: 'Running tests' })
+        const visible = buildVisibleChatBlocks([reasoning, running], { hasMoreMessages: false })
+
+        expect(visible).toEqual([reasoning, running])
     })
 
     it('does not carry a heading across a text boundary', () => {

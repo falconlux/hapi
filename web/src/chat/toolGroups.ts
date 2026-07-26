@@ -226,6 +226,10 @@ export function isEligibleForToolGrouping(block: ToolCallBlock): boolean {
     if (PLAN_TOOL_NAMES.has(block.tool.name)) return false
     if (MILESTONE_TOOL_NAMES.has(block.tool.name)) return false
     if (isInteractiveToolBlock(block)) return false
+    // Keep live work expanded. A running command needs its timer/output preview
+    // visible instead of disappearing into a collapsed history group. Once it
+    // completes, the next reduction pass folds it into the surrounding phase.
+    if (block.tool.state === 'running' || block.tool.state === 'pending') return false
     if (block.tool.name === 'CodexBash' && getCodexCommandActions(block).length > 0) {
         return isCodexExplorationTool(block)
     }
@@ -235,6 +239,12 @@ export function isEligibleForToolGrouping(block: ToolCallBlock): boolean {
 function getGroupingFamily(block: ToolCallBlock): 'default' | 'codex-exploration' | null {
     if (!isEligibleForToolGrouping(block)) return null
     return isCodexExplorationTool(block) ? 'codex-exploration' : 'default'
+}
+
+function isCompletedCodexReasoning(block: VisibleChatBlock | undefined): block is ToolCallBlock {
+    return block?.kind === 'tool-call'
+        && block.tool.name === 'CodexReasoning'
+        && block.tool.state === 'completed'
 }
 
 function createToolGroupId(
@@ -289,17 +299,25 @@ export function buildVisibleChatBlocks(
             cursor += 1
         }
 
-        if (tools.length < 2 && groupingFamily !== 'codex-exploration') {
+        const previousBlock = visibleBlocks.at(-1)
+        const precedingReasoning = isCompletedCodexReasoning(previousBlock) ? previousBlock : null
+
+        // A reasoning heading plus even one completed operation is one logical
+        // phase. Rendering both as separate cards doubles the noise and makes
+        // long Codex runs look like an unexplained wall of actions.
+        if (tools.length < 2 && groupingFamily !== 'codex-exploration' && !precedingReasoning) {
             visibleBlocks.push(block)
             continue
         }
 
+        if (precedingReasoning) {
+            visibleBlocks.pop()
+        }
+
         const startsAtOldestVisibleBoundary = visibleBlocks.length === 0
         const needsOlderHistory = options.hasMoreMessages && startsAtOldestVisibleBoundary
-        const previousBlock = visibleBlocks.at(-1)
-        const activityTitle = previousBlock?.kind === 'tool-call'
-            && previousBlock.tool.name === 'CodexReasoning'
-            ? getInputStringAny(previousBlock.tool.input, ['title'])
+        const activityTitle = precedingReasoning
+            ? getInputStringAny(precedingReasoning.tool.input, ['title'])
             : null
         visibleBlocks.push({
             kind: 'tool-group',
