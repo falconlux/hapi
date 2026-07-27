@@ -14,6 +14,7 @@ export interface ReasoningToolCall {
     callId: string;
     input: {
         title: string;
+        summary?: string;
     };
     id: string;
 }
@@ -36,6 +37,10 @@ export interface ReasoningMessage {
 
 export type ReasoningOutput = ReasoningToolCall | ReasoningToolResult | ReasoningMessage;
 
+const LIVE_REASONING_FALLBACK_TITLE = 'Analyzing next step';
+const LIVE_REASONING_PREVIEW_LIMIT = 600;
+const LIVE_REASONING_UPDATE_MIN_DELTA = 48;
+
 export class ReasoningProcessor {
     private accumulator: string = '';
     private inTitleCapture: boolean = false;
@@ -45,6 +50,7 @@ export class ReasoningProcessor {
     private currentCallId: string | null = null;
     private toolCallStarted: boolean = false;
     private currentTitle: string | null = null;
+    private lastPublishedSnapshot: string = '';
     private onMessage: ((message: any) => void) | null = null;
 
     constructor(onMessage?: (message: any) => void) {
@@ -102,12 +108,13 @@ export class ReasoningProcessor {
                 this.contentBuffer = afterTitle;
                 
                 // Generate a call ID for this reasoning section
-                this.currentCallId = randomUUID();
+                this.currentCallId = this.currentCallId || randomUUID();
                 
                 logger.debug(`[ReasoningProcessor] Title captured: "${title}"`);
                 
-                // Send tool call immediately when title is detected
-                this.sendToolCallStart(title);
+                // Replace the provisional live heading as soon as the real
+                // public summary title is available.
+                this.publishLiveProgress(true);
             }
         } else if (this.hasTitle) {
             // We have a title, accumulate content after title
@@ -119,13 +126,53 @@ export class ReasoningProcessor {
             // Untitled reasoning, just accumulate
             this.contentBuffer = this.accumulator;
         }
+
+        // App-server summary deltas are already the provider's public
+        // reasoning summary (not hidden chain-of-thought). Publish a live card
+        // on the first delta so remote users do not stare at an empty screen,
+        // then update it in coarse chunks to avoid one Hub message per token.
+        this.publishLiveProgress(false);
     }
 
     /**
-     * Send the tool call start message
+     * Return a compact public preview suitable for a live progress card.
      */
-    private sendToolCallStart(title: string): void {
-        if (!this.currentCallId || this.toolCallStarted) {
+    private getLiveSummary(): string {
+        const source = this.hasTitle
+            ? this.contentBuffer
+            : this.inTitleCapture
+                ? ''
+                : this.contentBuffer;
+        const compact = source.replace(/\s+/g, ' ').trim();
+        if (compact.length <= LIVE_REASONING_PREVIEW_LIMIT) return compact;
+        return `${compact.slice(0, LIVE_REASONING_PREVIEW_LIMIT - 1)}…`;
+    }
+
+    /**
+     * Return the best currently known activity heading.
+     */
+    private getLiveTitle(): string {
+        const title = this.currentTitle?.trim()
+            || (this.inTitleCapture ? this.titleBuffer.split('**', 1)[0]?.trim() : '');
+        if (!title) return LIVE_REASONING_FALLBACK_TITLE;
+        return title.replace(/\s+/g, ' ').slice(0, 160);
+    }
+
+    /**
+     * Start or update the single live reasoning card for this summary part.
+     */
+    private publishLiveProgress(force: boolean): void {
+        this.currentCallId = this.currentCallId || randomUUID();
+
+        const title = this.getLiveTitle();
+        const summary = this.getLiveSummary();
+        const snapshot = `${title}\u0000${summary}`;
+        if (snapshot === this.lastPublishedSnapshot) return;
+        if (
+            this.toolCallStarted
+            && !force
+            && snapshot.length - this.lastPublishedSnapshot.length < LIVE_REASONING_UPDATE_MIN_DELTA
+        ) {
             return;
         }
 
@@ -134,14 +181,20 @@ export class ReasoningProcessor {
             name: 'CodexReasoning',
             callId: this.currentCallId,
             input: {
-                title: title
+                title,
+                ...(summary ? { summary } : {})
             },
             id: randomUUID()
         };
 
-        logger.debug(`[ReasoningProcessor] Sending tool call start for: "${title}"`);
+        logger.debug(
+            this.toolCallStarted
+                ? `[ReasoningProcessor] Updating live reasoning: "${title}"`
+                : `[ReasoningProcessor] Sending tool call start for: "${title}"`
+        );
         this.onMessage?.(toolCall);
         this.toolCallStarted = true;
+        this.lastPublishedSnapshot = snapshot;
     }
 
     /**
@@ -162,10 +215,21 @@ export class ReasoningProcessor {
 
         logger.debug(`[ReasoningProcessor] Complete reasoning - Title: "${title}", Has content: ${content.length > 0}`);
         
-        if (title && !this.toolCallStarted) {
-            // If we have a title but haven't sent the tool call yet, send it now
-            this.currentCallId = this.currentCallId || randomUUID();
-            this.sendToolCallStart(title);
+        if (title) {
+            this.currentTitle = title;
+            this.hasTitle = true;
+            this.inTitleCapture = false;
+            this.contentBuffer = content;
+        } else if (this.toolCallStarted) {
+            this.currentTitle = null;
+            this.hasTitle = false;
+            this.inTitleCapture = false;
+            this.contentBuffer = content;
+        }
+
+        // Flush the final public heading/body before completing the card.
+        if (this.toolCallStarted || title) {
+            this.publishLiveProgress(true);
         }
 
         if (this.toolCallStarted && this.currentCallId) {
@@ -218,6 +282,7 @@ export class ReasoningProcessor {
      */
     private finishCurrentToolCall(status: 'completed' | 'canceled'): void {
         if (this.toolCallStarted && this.currentCallId) {
+            this.publishLiveProgress(true);
             // Send tool call result with canceled status
             const toolResult: ReasoningToolResult = {
                 type: 'tool-call-result',
@@ -245,6 +310,7 @@ export class ReasoningProcessor {
         this.currentCallId = null;
         this.toolCallStarted = false;
         this.currentTitle = null;
+        this.lastPublishedSnapshot = '';
     }
 
     /**

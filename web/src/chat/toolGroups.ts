@@ -3,6 +3,7 @@ import { getCodexCommandActions, isCodexExplorationTool } from '@/chat/codexComm
 import { isSubagentToolName } from '@/chat/subagentTool'
 import { isAskUserQuestionToolName } from '@/components/ToolCard/askUserQuestion'
 import { isRequestUserInputToolName } from '@/components/ToolCard/requestUserInput'
+import { getCodexReasoningSummary } from '@/lib/codexReasoningSummary'
 import { getInputStringAny } from '@/lib/toolInputUtils'
 
 export type ToolGroupActionKind = 'read' | 'search' | 'command' | 'mutation' | 'web' | 'other'
@@ -33,6 +34,7 @@ export type ToolGroupBlock = {
     needsOlderHistory: boolean
     activityTitle?: string | null
     presentationMode?: 'default' | 'codex-exploration'
+    activitySummary?: string | null
     summary: ToolGroupSummary
 }
 
@@ -319,6 +321,9 @@ export function buildVisibleChatBlocks(
         const activityTitle = precedingReasoning
             ? getInputStringAny(precedingReasoning.tool.input, ['title'])
             : null
+        const activitySummary = precedingReasoning
+            ? getCodexReasoningSummary(precedingReasoning.tool.result, activityTitle)
+            : null
         visibleBlocks.push({
             kind: 'tool-group',
             id: createToolGroupId(tools, needsOlderHistory, previousGroups),
@@ -332,6 +337,7 @@ export function buildVisibleChatBlocks(
             needsOlderHistory,
             activityTitle,
             presentationMode: groupingFamily,
+            activitySummary,
             summary: summarizeToolGroup(tools)
         })
         index = cursor - 1

@@ -575,6 +575,7 @@ export default {
   'toolGroup.toolCount': '{n} 次操作',
   'toolGroup.loadingOlderHistory': '正在补加载更早的工具活动…',
   'toolGroup.historyUnavailable': '更早的工具活动已不可用。',
+  'toolGroup.reasoningSummary': '思考摘要',
   'toolGroup.rowStatus.running': '运行中',
   'toolGroup.rowStatus.pending': '等待中',
   'toolGroup.rowStatus.error': '错误',

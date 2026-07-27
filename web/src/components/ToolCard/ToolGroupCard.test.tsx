@@ -180,6 +180,23 @@ describe('ToolGroupCard', () => {
         expect(screen.getByText('4.0s')).toBeInTheDocument()
     })
 
+    it('shows the public reasoning summary while the activity group is collapsed', () => {
+        const view = renderCard(makeGroup({
+            activityTitle: '检查消息分组',
+            activitySummary: '发现摘要正文在合并时被丢弃，因此正在保留并内联展示。下一步运行回归测试。'
+        }))
+
+        expect(screen.getByText('发现摘要正文在合并时被丢弃，因此正在保留并内联展示。下一步运行回归测试。'))
+            .toBeInTheDocument()
+
+        const groupToggle = within(view.container).getByRole('button', { name: /检查消息分组/i })
+        fireEvent.click(groupToggle)
+
+        expect(screen.getByText('Reasoning summary')).toBeInTheDocument()
+        expect(screen.getAllByText('发现摘要正文在合并时被丢弃，因此正在保留并内联展示。下一步运行回归测试。'))
+            .toHaveLength(2)
+    })
+
     it('expands to show compact rows and opens a detail dialog per row', async () => {
         const view = renderCard(makeGroup())
         const groupToggle = within(view.container).getByRole('button', { name: /inspect a\.ts/i })

@@ -24,6 +24,7 @@ import { getInputStringAny, truncate } from '@/lib/toolInputUtils'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/use-translation'
 import { localizeCodexActivityTitle } from '@/lib/codexActivityTitle'
+import { getCodexReasoningSummary } from '@/lib/codexReasoningSummary'
 import { TraceSection } from '@/components/ToolCard/trace'
 import { isSubagentToolName } from '@/chat/subagentTool'
 import { formatLiveCommandOutput, getLiveCommandProgress } from '@/components/ToolCard/commandProgress'
@@ -479,6 +480,10 @@ function ToolCardInner(props: ToolCardProps) {
     const useCompactTerminalCard = shouldUseCompactTerminalToolCard(toolName, props.terminalToolDisplayMode)
     const showCompactCommandProgress = useCompactTerminalCard && props.block.tool.state === 'running'
     const showInline = shouldShowInlineToolCardBody(toolName, presentation.minimal, props.terminalToolDisplayMode)
+    const reasoningSummary = toolName === 'CodexReasoning'
+        ? getCodexReasoningSummary(props.block.tool.result, presentation.title)
+            ?? getCodexReasoningSummary(props.block.tool.input, presentation.title)
+        : null
     const CompactToolView = showInline ? getToolViewComponent(toolName) : null
     const compactViewOwnsInteractions = toolName === 'CodexDiff'
     const ResultToolView = getToolResultViewComponent(toolName)
@@ -490,7 +495,7 @@ function ToolCardInner(props: ToolCardProps) {
         permission.status === 'pending'
         || ((permission.status === 'denied' || permission.status === 'canceled') && Boolean(permission.reason))
     ))
-    const hasBody = showInline || showCompactCommandProgress || taskSummary !== null || showsPermissionFooter
+    const hasBody = showInline || showCompactCommandProgress || reasoningSummary !== null || taskSummary !== null || showsPermissionFooter
     // Header/content padding already supplies 12-16px below timing; add only
     // the remainder needed to match the detail dialog's 16px section gap.
     const inlineBodySpacing = props.block.tool.state === 'pending'
@@ -607,6 +612,12 @@ function ToolCardInner(props: ToolCardProps) {
 
             {hasBody ? (
                 <CardContent className="px-3 pb-3 pt-1">
+                    {reasoningSummary ? (
+                        <p className="line-clamp-2 text-sm leading-snug text-[var(--app-fg)] opacity-80">
+                            {reasoningSummary}
+                        </p>
+                    ) : null}
+
                     {showCompactCommandProgress ? (
                         <RunningCommandPreview block={props.block} />
                     ) : null}

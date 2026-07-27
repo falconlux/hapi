@@ -576,6 +576,7 @@ export default {
   'toolGroup.toolCount': '{n} actions',
   'toolGroup.loadingOlderHistory': 'Loading earlier tool activity…',
   'toolGroup.historyUnavailable': 'Earlier tool activity is unavailable.',
+  'toolGroup.reasoningSummary': 'Reasoning summary',
   'toolGroup.rowStatus.running': 'Running',
   'toolGroup.rowStatus.pending': 'Pending',
   'toolGroup.rowStatus.error': 'Error',
