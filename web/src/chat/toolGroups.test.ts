@@ -172,6 +172,33 @@ describe('Codex activity headings', () => {
         expect(isToolGroupBlock(visible[0]) ? visible[0].activityTitle : null).toBe('Inspecting authentication')
     })
 
+    it('preserves a useful reasoning summary when folding the phase into a tool group', () => {
+        const reasoning = makeToolBlock('reasoning-1', 'CodexReasoning', { title: '检查消息分组' })
+        reasoning.tool.result = {
+            content: '发现正文在合并时被丢弃，因此需要写入分组模型。下一步补内联展示。',
+            status: 'completed'
+        }
+        const visible = buildVisibleChatBlocks([
+            reasoning,
+            makeToolBlock('read-1', 'Read', { file_path: 'toolGroups.ts' }),
+        ], { hasMoreMessages: false })
+
+        expect(visible).toHaveLength(1)
+        expect(isToolGroupBlock(visible[0]) ? visible[0].activitySummary : null)
+            .toBe('发现正文在合并时被丢弃，因此需要写入分组模型。下一步补内联展示。')
+    })
+
+    it('does not attach title-only reasoning noise to the folded tool group', () => {
+        const reasoning = makeToolBlock('reasoning-1', 'CodexReasoning', { title: '检查消息分组' })
+        reasoning.tool.result = { content: '**更新最终词汇映射**', status: 'completed' }
+        const visible = buildVisibleChatBlocks([
+            reasoning,
+            makeToolBlock('read-1', 'Read', { file_path: 'toolGroups.ts' }),
+        ], { hasMoreMessages: false })
+
+        expect(isToolGroupBlock(visible[0]) ? visible[0].activitySummary : null).toBeNull()
+    })
+
     it('folds one completed operation into its reasoning phase', () => {
         const visible = buildVisibleChatBlocks([
             makeToolBlock('reasoning-1', 'CodexReasoning', { title: 'Checking screenshot size' }),

@@ -2,6 +2,7 @@ import type { ChatBlock, ToolCallBlock } from '@/chat/types'
 import { isSubagentToolName } from '@/chat/subagentTool'
 import { isAskUserQuestionToolName } from '@/components/ToolCard/askUserQuestion'
 import { isRequestUserInputToolName } from '@/components/ToolCard/requestUserInput'
+import { getCodexReasoningSummary } from '@/lib/codexReasoningSummary'
 import { getInputStringAny } from '@/lib/toolInputUtils'
 
 export type ToolGroupActionKind = 'read' | 'search' | 'command' | 'mutation' | 'web' | 'other'
@@ -31,6 +32,7 @@ export type ToolGroupBlock = {
     historyState: 'complete' | 'needs-older-history'
     needsOlderHistory: boolean
     activityTitle?: string | null
+    activitySummary?: string | null
     summary: ToolGroupSummary
 }
 
@@ -282,6 +284,9 @@ export function buildVisibleChatBlocks(
         const activityTitle = precedingReasoning
             ? getInputStringAny(precedingReasoning.tool.input, ['title'])
             : null
+        const activitySummary = precedingReasoning
+            ? getCodexReasoningSummary(precedingReasoning.tool.result, activityTitle)
+            : null
         visibleBlocks.push({
             kind: 'tool-group',
             id: createToolGroupId(tools, needsOlderHistory, previousGroups),
@@ -294,6 +299,7 @@ export function buildVisibleChatBlocks(
             historyState: needsOlderHistory ? 'needs-older-history' : 'complete',
             needsOlderHistory,
             activityTitle,
+            activitySummary,
             summary: summarizeToolGroup(tools)
         })
         index = cursor - 1

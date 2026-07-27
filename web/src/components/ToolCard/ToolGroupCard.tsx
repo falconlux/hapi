@@ -244,6 +244,11 @@ export function ToolGroupCard(props: {
                         <div className="flex shrink-0 items-center text-[var(--app-hint)]">
                             <GroupStatusBadge block={props.block} />
                         </div>
+                        {props.block.activitySummary ? (
+                            <p className="col-span-2 col-start-2 line-clamp-2 text-sm leading-snug text-[var(--app-fg)] opacity-80">
+                                {props.block.activitySummary}
+                            </p>
+                        ) : null}
                         <CardDescription className="col-span-2 col-start-2 flex min-w-0 items-center gap-1 text-xs text-[var(--app-tool-card-subtitle)]">
                             {meta.location ? (
                                 <>
@@ -259,6 +264,16 @@ export function ToolGroupCard(props: {
 
             {open ? (
                 <CardContent className="px-3 pb-3 pt-1">
+                    {props.block.activitySummary ? (
+                        <div className="mb-2 rounded-xl border border-sky-500/15 bg-sky-500/5 px-3 py-2">
+                            <div className="mb-1 text-xs font-medium text-[var(--app-hint)]">
+                                {t('toolGroup.reasoningSummary')}
+                            </div>
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--app-fg)]">
+                                {props.block.activitySummary}
+                            </p>
+                        </div>
+                    ) : null}
                     <div className="flex flex-col gap-2">
                         {props.block.tools.map((tool) => {
                             return (
