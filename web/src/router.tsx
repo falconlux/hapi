@@ -12,7 +12,6 @@ import {
     useParams,
     useSearch,
 } from '@tanstack/react-router'
-import { getScrollRestorationKey } from '@/lib/scrollRestorationKey'
 import { App } from '@/App'
 import { SessionChat } from '@/components/SessionChat'
 import { SessionList } from '@/components/SessionList'
@@ -1445,8 +1444,7 @@ export function createAppRouter(history?: RouterHistory) {
     return createRouter({
         routeTree,
         history,
-        scrollRestoration: true,
-        getScrollRestorationKey,
+        scrollRestoration: false,
     })
 }
 
