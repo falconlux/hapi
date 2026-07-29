@@ -213,7 +213,7 @@ describe('responsive settings pages', () => {
     it('clears the local cache from the About page', async () => {
         renderPage(<SettingsAboutPage />)
 
-        fireEvent.click(screen.getByRole('button', { name: 'Clear cache & reload' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Clear & reload' }))
 
         await waitFor(() => expect(clearAppCacheAndReload).toHaveBeenCalledOnce())
     })
@@ -222,10 +222,10 @@ describe('responsive settings pages', () => {
         clearAppCacheAndReload.mockRejectedValueOnce(new Error('failed'))
         renderPage(<SettingsAboutPage />)
 
-        fireEvent.click(screen.getByRole('button', { name: 'Clear cache & reload' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Clear & reload' }))
 
         expect(await screen.findByRole('alert')).toHaveTextContent('Could not clear the cache. Please try again.')
-        expect(screen.getByRole('button', { name: 'Clear cache & reload' })).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'Clear & reload' })).toBeEnabled()
     })
 
     it('links common voice settings to full-page voices and advanced pages', () => {
