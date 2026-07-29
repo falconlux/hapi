@@ -31,7 +31,6 @@ import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePic
 import { resolvePendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import { HappyThread } from '@/components/AssistantChat/HappyThread'
 import { QueuedMessagesBar } from '@/components/AssistantChat/QueuedMessagesBar'
-import { AgentProgressCard } from '@/components/AgentProgress/AgentProgressCard'
 import { ScratchlistDrawer } from '@/components/AssistantChat/ScratchlistPanel'
 import { useScratchlist } from '@/lib/use-scratchlist'
 import { useHappyRuntime } from '@/lib/assistant-runtime'
@@ -1331,13 +1330,6 @@ function SessionChatInner(props: SessionChatProps) {
                             }}
                         />
                     </div>
-
-                    <AgentProgressCard
-                        blocks={reconciled.blocks}
-                        fallbackObjective={outlineTitle}
-                        isRunning={props.session.thinking || hasRunningChildAgent}
-                        metadata={props.session.metadata}
-                    />
 
                     <HappyComposer
                         key={`composer-${props.session.id}`}
