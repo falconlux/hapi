@@ -790,7 +790,7 @@ export default {
   'settings.about.maintenance': '维护',
   'settings.about.cache': '本地缓存',
   'settings.about.cacheDescription': '清除已下载的应用文件和消息窗口缓存，保留登录状态与用户设置。',
-  'settings.about.clearCache': '清理并重新加载',
+  'settings.about.clearCache': '清理缓存并重新加载',
   'settings.about.clearingCache': '正在清理…',
   'settings.about.cacheClearFailed': '缓存清理失败，请重试。',
 

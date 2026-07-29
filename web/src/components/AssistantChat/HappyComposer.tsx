@@ -32,6 +32,7 @@ import { ComposerButtons } from '@/components/AssistantChat/ComposerButtons'
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import { AttachmentItem } from '@/components/AssistantChat/AttachmentItem'
 import { useTranslation } from '@/lib/use-translation'
+import { clearAppCacheAndReload } from '@/lib/appCache'
 import { getModelOptionsForFlavor, getNextModelForFlavor } from './modelOptions'
 import { getClaudeComposerEffortOptions } from './claudeEffortOptions'
 import { getCodexComposerReasoningEffortOptions } from './codexReasoningEffortOptions'
@@ -81,6 +82,46 @@ export type ComposerSendError = {
 }
 
 const defaultSuggestionHandler = async (): Promise<Suggestion[]> => []
+
+export function CacheMaintenanceAction() {
+    const { t } = useTranslation()
+    const [cacheState, setCacheState] = useState<'idle' | 'clearing' | 'error'>('idle')
+
+    const clearCache = async () => {
+        if (cacheState === 'clearing') {
+            return
+        }
+        setCacheState('clearing')
+        try {
+            await clearAppCacheAndReload()
+        } catch {
+            setCacheState('error')
+        }
+    }
+
+    return (
+        <div className="py-2">
+            <div className="px-3 pb-1 text-xs font-semibold text-[var(--app-hint)]">
+                {t('settings.about.maintenance')}
+            </div>
+            <button
+                type="button"
+                onClick={() => void clearCache()}
+                onMouseDown={(event) => event.preventDefault()}
+                disabled={cacheState === 'clearing'}
+                aria-busy={cacheState === 'clearing'}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--app-link)] transition-colors hover:bg-[var(--app-secondary-bg)] disabled:cursor-wait disabled:opacity-50"
+            >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 shrink-0" aria-hidden="true">
+                    <path d="M20 11a8 8 0 1 0-2.34 5.66" />
+                    <path d="M20 4v7h-7" />
+                </svg>
+                <span>{cacheState === 'clearing' ? t('settings.about.clearingCache') : t('settings.about.clearCache')}</span>
+            </button>
+            {cacheState === 'error' ? <div role="alert" className="px-3 pt-1 text-xs text-red-500">{t('settings.about.cacheClearFailed')}</div> : null}
+        </div>
+    )
+}
 
 export function ModelEffortSettingsSection(props: {
     agentFlavor?: string | null
@@ -884,6 +925,8 @@ export function HappyComposer(props: {
             return (
                 <div className="absolute bottom-[100%] mb-2 w-full">
                     <FloatingOverlay maxHeight={320}>
+                        <CacheMaintenanceAction />
+                        <div className="mx-3 h-px bg-[var(--app-divider)]" />
                         {showCollaborationSettings ? (
                             <div className="py-2">
                                 <div className="px-3 pb-1 text-xs font-semibold text-[var(--app-hint)]">
