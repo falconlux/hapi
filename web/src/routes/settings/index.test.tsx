@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nProvider } from '@/lib/i18n-context'
 import SettingsHubPage from './index'
@@ -11,8 +11,9 @@ import SettingsVoicePage from './voice'
 import SettingsVoiceVoicesPage from './voice-voices'
 import SettingsVoiceAdvancedPage from './voice-advanced'
 
-const { context, navigate, setAppearance, setColorTheme, setFontScale, setTerminalFontSize, setComposerEnterBehavior, setCodexExplorationCollapsed, setVoice } = vi.hoisted(() => ({
+const { context, clearAppCacheAndReload, navigate, setAppearance, setColorTheme, setFontScale, setTerminalFontSize, setComposerEnterBehavior, setCodexExplorationCollapsed, setVoice } = vi.hoisted(() => ({
     context: { token: '' },
+    clearAppCacheAndReload: vi.fn(),
     navigate: vi.fn(),
     setAppearance: vi.fn(),
     setColorTheme: vi.fn(),
@@ -25,6 +26,8 @@ const { context, navigate, setAppearance, setColorTheme, setFontScale, setTermin
 
 const getHubSettings = vi.fn().mockResolvedValue({ sessionSummaryContract: false })
 const updateHubSettings = vi.fn().mockResolvedValue({ sessionSummaryContract: true })
+
+vi.mock('@/lib/appCache', () => ({ clearAppCacheAndReload }))
 
 vi.mock('@/hooks/useColorTheme', () => ({
     useColorTheme: () => ({ colorTheme: 'default', setColorTheme }),
@@ -215,6 +218,7 @@ function renderPage(page: React.ReactElement) {
 describe('responsive settings pages', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        clearAppCacheAndReload.mockResolvedValue(undefined)
         localStorage.clear()
         getHubSettings.mockResolvedValue({ sessionSummaryContract: false })
         updateHubSettings.mockResolvedValue({ sessionSummaryContract: true })
@@ -297,6 +301,24 @@ describe('responsive settings pages', () => {
         expect(screen.getByText(String(__APP_VERSION__))).toBeInTheDocument()
         expect(screen.getByText('Protocol Version')).toBeInTheDocument()
         expect(screen.getByRole('link', { name: 'hapi.run' })).toHaveAttribute('rel', 'noopener noreferrer')
+    })
+
+    it('clears the local cache from the About page', async () => {
+        renderPage(<SettingsAboutPage />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Clear & reload' }))
+
+        await waitFor(() => expect(clearAppCacheAndReload).toHaveBeenCalledOnce())
+    })
+
+    it('shows a retryable error when cache clearing fails', async () => {
+        clearAppCacheAndReload.mockRejectedValueOnce(new Error('failed'))
+        renderPage(<SettingsAboutPage />)
+
+        fireEvent.click(screen.getByRole('button', { name: 'Clear & reload' }))
+
+        expect(await screen.findByRole('alert')).toHaveTextContent('Could not clear the cache. Please try again.')
+        expect(screen.getByRole('button', { name: 'Clear & reload' })).toBeEnabled()
     })
 
     it('links common voice settings to full-page voices and advanced pages', () => {
