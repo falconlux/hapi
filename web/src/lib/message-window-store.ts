@@ -2,6 +2,7 @@ import type { ApiClient } from '@/api/client'
 import type { DecryptedMessage, MessageStatus, MessagesResponse } from '@/types/api'
 import { normalizeDecryptedMessage } from '@/chat/normalize'
 import { isQueuedForInvocation, isUserMessage, mergeMessages } from '@/lib/messages'
+import { MESSAGE_WINDOW_STORAGE_KEY_PREFIX } from '@/lib/message-window-storage'
 
 export type MessageWindowState = {
     sessionId: string
@@ -71,7 +72,6 @@ const latestLoads = new Map<string, Promise<void>>()
 // Windows UI jank caused by excessive React re-renders during SSE streaming.
 const NOTIFY_THROTTLE_MS = 150
 const PERSIST_THROTTLE_MS = 200
-const STORAGE_KEY_PREFIX = 'hapi:message-window:v1:'
 const pendingNotifySessionIds = new Set<string>()
 const pendingPersistSessionIds = new Set<string>()
 let notifyRafId: ReturnType<typeof requestAnimationFrame> | null = null
@@ -113,7 +113,7 @@ function flushNotifications(): void {
 }
 
 function getStorageKey(sessionId: string): string {
-    return `${STORAGE_KEY_PREFIX}${sessionId}`
+    return `${MESSAGE_WINDOW_STORAGE_KEY_PREFIX}${sessionId}`
 }
 
 function isSessionStorageAvailable(): boolean {

@@ -783,6 +783,12 @@ export default {
   'settings.about.website': 'Website',
   'settings.about.appVersion': 'App Version',
   'settings.about.protocolVersion': 'Protocol Version',
+  'settings.about.maintenance': 'Maintenance',
+  'settings.about.cache': 'Local cache',
+  'settings.about.cacheDescription': 'Clear downloaded app files and cached message windows. Your sign-in and preferences are kept.',
+  'settings.about.clearCache': 'Clear & reload',
+  'settings.about.clearingCache': 'Clearing…',
+  'settings.about.cacheClearFailed': 'Could not clear the cache. Please try again.',
 
   // Browse / Workspace
   'browse.title': 'Browse',
