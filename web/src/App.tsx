@@ -349,7 +349,7 @@ function AppInner() {
     const sseEnabled = Boolean(api && token)
     const showReconnectingBanner = sseDisconnected && !isSyncing
 
-    const { subscriptionId: globalSubscriptionId } = useSSE({
+    const { subscriptionId: globalSubscriptionId, reconnect: reconnectGlobalSse } = useSSE({
         enabled: sseEnabled,
         token: token ?? '',
         baseUrl,
@@ -361,7 +361,7 @@ function AppInner() {
         onToast: handleToast
     })
 
-    const { subscriptionId: sessionSubscriptionId } = useSSE({
+    const { subscriptionId: sessionSubscriptionId, reconnect: reconnectSessionSse } = useSSE({
         enabled: sseEnabled && Boolean(sessionEventSubscription),
         token: token ?? '',
         baseUrl,
@@ -370,6 +370,11 @@ function AppInner() {
         onConnect: handleSessionSseConnect,
         onEvent: handleSseEvent
     })
+
+    const restoreConnection = useCallback(() => {
+        reconnectGlobalSse()
+        reconnectSessionSse()
+    }, [reconnectGlobalSse, reconnectSessionSse])
 
     useVisibilityReporter({
         api,
@@ -472,11 +477,13 @@ function AppInner() {
                 <ReconnectingBanner
                     isReconnecting={showReconnectingBanner}
                     reason={sseDisconnectReason}
+                    onRestore={restoreConnection}
                 />
                 <VoiceErrorBanner />
                 <OfflineBanner
                     isHubConnected={globalSubscriptionId !== null}
                     isReconnecting={showReconnectingBanner}
+                    onRestore={restoreConnection}
                 />
                 <div className="h-full min-h-0 flex flex-col">
                     <Outlet />

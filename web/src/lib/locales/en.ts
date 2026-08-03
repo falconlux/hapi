@@ -670,6 +670,7 @@ export default {
   // Banners
   'offline.title': 'Offline',
   'offline.message': 'You are currently offline. Some features may be limited.',
+  'offline.restore': 'Restore',
   'syncing.title': 'Syncing…',
   'syncing.message': 'Your data is being synchronized.',
   'reconnecting.message': 'Reconnecting...',

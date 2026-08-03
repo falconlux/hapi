@@ -669,6 +669,7 @@ export default {
   // Banners
   'offline.title': '离线',
   'offline.message': '您当前处于离线状态。某些功能可能受限。',
+  'offline.restore': '恢复',
   'syncing.title': '同步中…',
   'syncing.message': '正在同步您的数据。',
   'reconnecting.message': '正在重新连接...',

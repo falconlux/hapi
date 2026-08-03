@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
     computePendingRequestKinds,
@@ -336,7 +336,7 @@ export function useSSE(options: {
     onDisconnect?: (reason: string) => void
     onError?: (error: unknown) => void
     onToast?: (event: ToastEvent) => void
-}): { subscriptionId: string | null } {
+}): { subscriptionId: string | null; reconnect: () => void } {
     const queryClient = useQueryClient()
     const onEventRef = useRef(options.onEvent)
     const onConnectRef = useRef(options.onConnect)
@@ -365,6 +365,21 @@ export function useSSE(options: {
     const lastActivityAtRef = useRef(0)
     const [reconnectNonce, setReconnectNonce] = useState(0)
     const [subscriptionId, setSubscriptionId] = useState<string | null>(null)
+
+    const reconnect = useCallback(() => {
+        if (!options.enabled) {
+            return
+        }
+        if (reconnectTimerRef.current) {
+            clearTimeout(reconnectTimerRef.current)
+            reconnectTimerRef.current = null
+        }
+        reconnectAttemptRef.current = 0
+        eventSourceRef.current?.close()
+        eventSourceRef.current = null
+        setSubscriptionId(null)
+        setReconnectNonce((value) => value + 1)
+    }, [options.enabled])
 
     useEffect(() => {
         onEventRef.current = options.onEvent
@@ -958,5 +973,5 @@ export function useSSE(options: {
         }
     }, [options.baseUrl, options.enabled, options.scope, options.token, scope, subscriptionKey, queryClient, reconnectNonce])
 
-    return { subscriptionId }
+    return { subscriptionId, reconnect }
 }
