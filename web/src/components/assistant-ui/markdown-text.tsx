@@ -804,6 +804,8 @@ export function MarkdownText() {
     return (
         <UriConfirmProvider>
             <MarkdownTextPrimitive
+                // Re-parsing every streaming frame causes severe layout churn in Safari.
+                smooth={false}
                 remarkPlugins={MARKDOWN_PLUGINS}
                 rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
                 components={defaultComponents}

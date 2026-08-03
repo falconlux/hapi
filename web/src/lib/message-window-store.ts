@@ -37,9 +37,11 @@ export type MessageWindowState = {
     historyVersion: number
 }
 
-export const VISIBLE_WINDOW_SIZE = 400
+// Keep the live tail small enough for mobile Safari/WebKit while retaining
+// multiple complete API pages of normal conversation.
+export const VISIBLE_WINDOW_SIZE = 150
 export const HISTORY_WINDOW_SIZE = 600
-const AGENT_RUN_WINDOW_SIZE = 800
+export const AGENT_RUN_WINDOW_SIZE = 100
 const OLDER_LOAD_WINDOW_SIZE = 800
 const PAGE_SIZE = 200
 
@@ -270,16 +272,26 @@ function hydrateState(sessionId: string): InternalState | null {
         const epoch = typeof parsed.epoch === 'number' && Number.isInteger(parsed.epoch) && parsed.epoch >= 0
             ? parsed.epoch
             : null
-        return buildState(createState(sessionId), {
-            messages: mergeMessages([], parsed.messages.map(restoreMessage)),
-            hasMore: parsed.hasMore === true,
-            oldestPositionAt: oldest?.at ?? null,
-            oldestPositionSeq: oldest?.seq ?? null,
+        const restoredMessages = mergeMessages([], parsed.messages.map(restoreMessage))
+        const { kept, dropped } = trimPreservingQueued(restoredMessages, VISIBLE_WINDOW_SIZE, 'append')
+        const droppedRegular = dropped.some(isPageableRegularMessage)
+        const retainedOldest = droppedRegular
+            ? derivePosition(kept.filter(isPageableRegularMessage), 'oldest')
+            : oldest
+        const hydrated = buildState(createState(sessionId), {
+            messages: kept,
+            hasMore: parsed.hasMore === true || droppedRegular,
+            oldestPositionAt: retainedOldest?.at ?? null,
+            oldestPositionSeq: retainedOldest?.seq ?? null,
             newestPositionAt: newest?.at ?? null,
             newestPositionSeq: newest?.seq ?? null,
             epoch,
-            requiresLatestReset: parsed.messages.length > 0 && (newest === null || epoch === null)
+            requiresLatestReset: kept.length > 0 && (newest === null || epoch === null)
         })
+        if (dropped.length > 0) {
+            persistState(sessionId, hydrated)
+        }
+        return hydrated
     } catch {
         clearPersistedState(sessionId)
         return null
@@ -436,6 +448,12 @@ function isCodexAgentRunMessage(message: DecryptedMessage): boolean {
     return type === 'agent-run-start' || type === 'agent-run-update' || type === 'agent-run-trace'
 }
 
+function isPageableRegularMessage(message: DecryptedMessage): boolean {
+    return typeof message.seq === 'number'
+        && !isQueuedForInvocation(message)
+        && !isCodexAgentRunMessage(message)
+}
+
 function trimPreservingQueued(
     messages: DecryptedMessage[],
     regularLimit: number,
@@ -446,7 +464,7 @@ function trimPreservingQueued(
     const nonQueued = messages.filter((message) => !queuedIds.has(message.id))
     const agentRuns = nonQueued.filter(isCodexAgentRunMessage)
     const regular = nonQueued.filter((message) => !isCodexAgentRunMessage(message))
-    const regularTrim = sliceForTrim(regular, Math.max(0, regularLimit - queued.length), mode)
+    const regularTrim = sliceForTrim(regular, regularLimit, mode)
     const agentRunTrim = sliceForTrim(agentRuns, AGENT_RUN_WINDOW_SIZE, mode)
     return {
         kept: mergeMessages([...regularTrim.kept, ...agentRunTrim.kept], queued),
@@ -502,11 +520,12 @@ function mergeIntoWindow(
     let next = buildState(previous, {
         messages: kept
     })
-    if (dropped.length === 0) {
+    const droppedRegular = dropped.some(isPageableRegularMessage)
+    if (!droppedRegular) {
         return next
     }
     if (mode === 'append') {
-        const oldest = derivePosition(kept, 'oldest')
+        const oldest = derivePosition(kept.filter(isPageableRegularMessage), 'oldest')
         return buildState(next, {
             hasMore: true,
             oldestPositionAt: oldest?.at ?? next.oldestPositionAt,
@@ -548,6 +567,7 @@ function applyLatestResponse(
     const authoritative = mergeMessages(preserved, retainedResponseMessages)
     const incoming = mergeMessages(authoritative, concurrentServerRows)
     const { kept, dropped } = trimPreservingQueued(incoming, VISIBLE_WINDOW_SIZE, 'append')
+    const droppedRegular = dropped.some(isPageableRegularMessage)
     const snapshotHead = pagePosition(response.page.snapshotHeadAt, response.page.snapshotHeadSeq)
         ?? derivePosition(response.messages, 'newest')
     const newestKept = derivePosition(kept, 'newest')
@@ -556,14 +576,14 @@ function applyLatestResponse(
         : snapshotHead ?? newestKept
     const responseOldest = pagePosition(response.page.nextBeforeAt, response.page.nextBeforeSeq)
     const previousOldest = readPosition(previous.oldestPositionAt, previous.oldestPositionSeq)
-    const oldest = dropped.length > 0
-        ? derivePosition(kept, 'oldest')
+    const oldest = droppedRegular
+        ? derivePosition(kept.filter(isPageableRegularMessage), 'oldest')
         : options.replaceServerRows
             ? responseOldest
             : responseOldest ?? previousOldest
     return buildState(previous, {
         messages: kept,
-        hasMore: response.page.hasMore || (!options.replaceServerRows && previous.hasMore) || dropped.length > 0,
+        hasMore: response.page.hasMore || (!options.replaceServerRows && previous.hasMore) || droppedRegular,
         epoch: response.page.epoch,
         oldestPositionAt: oldest?.at ?? null,
         oldestPositionSeq: oldest?.seq ?? null,
@@ -742,12 +762,13 @@ async function waitForTailSyncDrain(
 function enterTailMode(previous: InternalState): InternalState {
     const { kept, dropped } = trimPreservingQueued(previous.messages, VISIBLE_WINDOW_SIZE, 'append')
     const forceLatest = previous.requiresLatestReset
-    const oldest = dropped.length > 0
-        ? derivePosition(kept, 'oldest')
+    const droppedRegular = dropped.some(isPageableRegularMessage)
+    const oldest = droppedRegular
+        ? derivePosition(kept.filter(isPageableRegularMessage), 'oldest')
         : readPosition(previous.oldestPositionAt, previous.oldestPositionSeq)
     return buildState(previous, {
         messages: kept,
-        hasMore: previous.hasMore || dropped.length > 0,
+        hasMore: previous.hasMore || droppedRegular,
         viewMode: 'tail',
         epoch: forceLatest ? null : previous.epoch,
         oldestPositionAt: oldest?.at ?? null,

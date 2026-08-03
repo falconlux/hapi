@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ApiClient } from '@/api/client'
 import type { DecryptedMessage, MessagesResponse } from '@/types/api'
 import {
+    AGENT_RUN_WINDOW_SIZE,
     HISTORY_WINDOW_SIZE,
     VISIBLE_WINDOW_SIZE,
     activateMessageWindow,
@@ -358,8 +359,8 @@ describe('message tail synchronization', () => {
         await fetchOlderMessages(api, id)
 
         expect(getMessages.mock.calls[1]?.[1]).toEqual({
-            beforeAt: 251,
-            beforeSeq: 251,
+            beforeAt: 651 - VISIBLE_WINDOW_SIZE,
+            beforeSeq: 651 - VISIBLE_WINDOW_SIZE,
             limit: 200
         })
     })
@@ -1059,12 +1060,52 @@ describe('history view and older pagination', () => {
         const root = makeUserMessage({ id: 'root', seq: 1, invokedAt: 1, createdAt: 1 })
         ingestIncomingMessages(id, [
             root,
-            ...Array.from({ length: VISIBLE_WINDOW_SIZE + 1 }, (_, index) =>
+            ...Array.from({ length: AGENT_RUN_WINDOW_SIZE + 20 }, (_, index) =>
                 makeAgentRunMessage(`run-${index}`, index + 2, index + 2)
             )
         ])
 
-        expect(getMessageWindowState(id).messages.some((message) => message.id === 'root')).toBe(true)
+        const state = getMessageWindowState(id)
+        expect(state.messages.some((message) => message.id === 'root')).toBe(true)
+        expect(state.messages.filter((message) => message.id.startsWith('run-'))).toHaveLength(AGENT_RUN_WINDOW_SIZE)
+        expect(state.messages.some((message) => message.id === 'run-0')).toBe(false)
+        expect(state.hasMore).toBe(false)
+    })
+
+    it('bounds an oversized persisted tail during hydration', () => {
+        const id = sessionId('persisted-oversized')
+        const regular = Array.from({ length: VISIBLE_WINDOW_SIZE + 50 }, (_, index) =>
+            makeAgentMessage({ id: `persisted-regular-${index}`, seq: index + 1, at: index + 1 })
+        )
+        const agentRuns = Array.from({ length: AGENT_RUN_WINDOW_SIZE + 50 }, (_, index) =>
+            makeAgentRunMessage(
+                `persisted-run-${index}`,
+                regular.length + index + 1,
+                regular.length + index + 1
+            )
+        )
+        sessionStorage.setItem(`hapi:message-window:v2:${id}`, JSON.stringify({
+            messages: [...regular, ...agentRuns],
+            hasMore: false,
+            oldestPositionAt: 1,
+            oldestPositionSeq: 1,
+            newestPositionAt: regular.length + agentRuns.length,
+            newestPositionSeq: regular.length + agentRuns.length,
+            epoch: 1
+        }))
+
+        const state = getMessageWindowState(id)
+
+        expect(state.messages.filter((message) => message.id.startsWith('persisted-regular-'))).toHaveLength(VISIBLE_WINDOW_SIZE)
+        expect(state.messages.filter((message) => message.id.startsWith('persisted-run-'))).toHaveLength(AGENT_RUN_WINDOW_SIZE)
+        expect(state.messages.some((message) => message.id === 'persisted-regular-0')).toBe(false)
+        expect(state.messages.some((message) => message.id === `persisted-regular-${regular.length - 1}`)).toBe(true)
+        expect(state.hasMore).toBe(true)
+
+        const persisted = JSON.parse(
+            sessionStorage.getItem(`hapi:message-window:v2:${id}`) ?? 'null'
+        ) as { messages?: DecryptedMessage[] } | null
+        expect(persisted?.messages).toHaveLength(VISIBLE_WINDOW_SIZE + AGENT_RUN_WINDOW_SIZE)
     })
 })
 
