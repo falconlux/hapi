@@ -3836,12 +3836,10 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                                 : `[Codex] Resumed app-server thread ${threadId}`);
                         } catch (error) {
                             const resumeError = formatCodexResumeError(error);
-                            logger.warn(`[Codex] Failed to resume app-server thread ${resumeCandidate}; preserving old conversation boundary: ${resumeError}`, error);
-                            const failureMessage = `Task failed: Codex conversation ${resumeCandidate} could not be resumed; no new conversation was created. Reason: ${resumeError}`;
-                            messageBuffer.addMessage(failureMessage, 'status');
-                            session.sendSessionEvent({ type: 'message', message: failureMessage });
-                            pending = null;
-                            continue;
+                            logger.warn(`[Codex] Failed to resume app-server thread ${resumeCandidate}; starting a new conversation: ${resumeError}`, error);
+                            const recoveryMessage = `Codex conversation ${resumeCandidate} could not be resumed; starting a new conversation. Reason: ${resumeError}`;
+                            messageBuffer.addMessage(recoveryMessage, 'status');
+                            session.sendSessionEvent({ type: 'message', message: recoveryMessage });
                         }
                     }
 

@@ -68,6 +68,38 @@ type PendingRequest = {
     cleanup: () => void;
 };
 
+const STDERR_TAIL_MAX_CHARS = 4 * 1024;
+
+export class CodexAppServerStderrTail {
+    private value = '';
+
+    append(chunk: string): void {
+        const combined = this.value + chunk;
+        this.value = combined.length > STDERR_TAIL_MAX_CHARS
+            ? combined.slice(-STDERR_TAIL_MAX_CHARS)
+            : combined;
+    }
+
+    reset(): void {
+        this.value = '';
+    }
+
+    detail(): string {
+        return this.value.trim();
+    }
+}
+
+export function formatCodexAppServerExitError(
+    code: number | null,
+    signal: NodeJS.Signals | null,
+    stderrDetail: string
+): string {
+    const message = `Codex app-server exited (code=${code ?? 'null'}, signal=${signal ?? 'null'})`;
+    const detail = stderrDetail.trim();
+    const failed = code !== 0 || signal !== null;
+    return failed && detail.length > 0 ? `${message}: ${detail}` : message;
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
     if (!value || typeof value !== 'object') {
         return null;
@@ -182,6 +214,7 @@ export class CodexAppServerClient extends JsonLineParser {
 
         const codexCommand = resolveCodexAppServerCommand();
         logger.debug(`[CodexAppServer] Starting ${codexCommand} app-server`);
+        const stderrTail = new CodexAppServerStderrTail();
         this.process = spawn(codexCommand, ['app-server'], {
             env: Object.keys(process.env).reduce((acc, key) => {
                 const value = process.env[key];
@@ -198,7 +231,9 @@ export class CodexAppServerClient extends JsonLineParser {
 
         this.process.stderr.setEncoding('utf8');
         this.process.stderr.on('data', (chunk) => {
-            const text = chunk.toString().trim();
+            const chunkText = chunk.toString();
+            stderrTail.append(chunkText);
+            const text = chunkText.trim();
             if (text.length > 0) {
                 logger.debug(`[CodexAppServer][stderr] ${text}`);
                 this.stderrHandler?.(text);
@@ -206,7 +241,7 @@ export class CodexAppServerClient extends JsonLineParser {
         });
 
         this.process.on('exit', (code, signal) => {
-            const message = `Codex app-server exited (code=${code ?? 'null'}, signal=${signal ?? 'null'})`;
+            const message = formatCodexAppServerExitError(code, signal, stderrTail.detail());
             logger.debug(message);
             this.rejectAllPending(new Error(message));
             this.connected = false;

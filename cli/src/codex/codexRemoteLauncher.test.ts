@@ -2307,7 +2307,7 @@ describe('codexRemoteLauncher', () => {
         expect(session.thinking).toBe(false);
     });
 
-    it('does not create a new thread when an existing conversation cannot be resumed', async () => {
+    it('starts a new thread and continues when an existing conversation cannot be resumed', async () => {
         harness.failResumeThreadIds = ['thread-old'];
         const { session, sessionEvents } = createSessionStub(['first message']);
         session.sessionId = 'thread-old';
@@ -2318,12 +2318,13 @@ describe('codexRemoteLauncher', () => {
         expect(harness.resumeThreadIds).toEqual(['thread-old']);
         expect(harness.resumeThreadParams).toHaveLength(1);
         expect(harness.resumeThreadParams[0]?.threadSource).toBeUndefined();
-        expect(harness.startThreadIds).toEqual([]);
-        expect(harness.startTurnThreadIds).toEqual([]);
-        expect(session.sessionId).toBe('thread-old');
+        expect(harness.startThreadIds).toEqual(['thread-1']);
+        expect(harness.startTurnThreadIds).toEqual(['thread-1']);
+        expect(harness.startTurnMessages).toEqual(['first message']);
+        expect(session.sessionId).toBe('thread-1');
         expect(sessionEvents).toContainEqual({
             type: 'message',
-            message: 'Task failed: Codex conversation thread-old could not be resumed; no new conversation was created. Reason: resume failed'
+            message: 'Codex conversation thread-old could not be resumed; starting a new conversation. Reason: resume failed'
         });
         expect(session.thinking).toBe(false);
     });
