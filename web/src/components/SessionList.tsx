@@ -41,6 +41,7 @@ type SessionGroup = {
     sessions: SessionSummary[]
     latestUpdatedAt: number
     hasActiveSession: boolean
+    hasThinkingSession: boolean
 }
 
 const RUNNING_BUCKETS = [
@@ -261,7 +262,7 @@ export function getPreviousSessionVisibleCount(current: number, step: number): n
     return Math.max(normalizedStep, current - normalizedStep)
 }
 
-function groupSessionsByDirectory(sessions: SessionSummary[]): SessionGroup[] {
+export function groupSessionsByDirectory(sessions: SessionSummary[]): SessionGroup[] {
     const groups = new Map<string, { directory: string; machineId: string | null; sessions: SessionSummary[] }>()
 
     sessions.forEach(session => {
@@ -291,6 +292,7 @@ function groupSessionsByDirectory(sessions: SessionSummary[]): SessionGroup[] {
                 -Infinity
             )
             const hasActiveSession = group.sessions.some(s => s.active)
+            const hasThinkingSession = group.sessions.some(s => s.active && s.thinking)
             const displayName = getGroupDisplayName(group.directory)
 
             return {
@@ -300,7 +302,8 @@ function groupSessionsByDirectory(sessions: SessionSummary[]): SessionGroup[] {
                 machineId: group.machineId,
                 sessions: sortedSessions,
                 latestUpdatedAt,
-                hasActiveSession
+                hasActiveSession,
+                hasThinkingSession
             }
         })
         .sort((a, b) => {
@@ -1689,6 +1692,13 @@ export function SessionList(props: {
                                 <span className="font-medium text-sm truncate flex-1">
                                     {groupTitle}
                                 </span>
+                                {group.hasThinkingSession ? (
+                                    <Spinner
+                                        size="sm"
+                                        label={t('session.item.thinking')}
+                                        className="shrink-0 text-[var(--app-hint)]"
+                                    />
+                                ) : null}
                                 <CopyPathButton path={group.directory} className="opacity-0 group-hover/project:opacity-100 transition-opacity duration-150" />
                                 {onNewSessionInDirectory && canStartInGroupDirectory ? (
                                     <button

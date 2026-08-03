@@ -13,6 +13,7 @@ import {
     getPreviousSessionVisibleCount,
     getPullToRefreshState,
     getSessionDedupKey,
+    groupSessionsByDirectory,
     getWorktreeSessionLabel,
     getVisibleSessionPreview,
     isSidebarEmptySessionStub,
@@ -523,6 +524,35 @@ describe('getNextSessionVisibleCount', () => {
 
     it('always advances by at least one even with a zero step', () => {
         expect(getNextSessionVisibleCount(5, 0, 20)).toBe(6)
+    })
+})
+
+describe('groupSessionsByDirectory', () => {
+    it('marks a directory as thinking only for an active thinking child session', () => {
+        const groups = groupSessionsByDirectory([
+            makeSession({
+                id: 'inactive-thinking',
+                thinking: true,
+                metadata: { path: '/work/inactive', machineId: 'machine-a' }
+            }),
+            makeSession({
+                id: 'active-not-thinking',
+                active: true,
+                metadata: { path: '/work/active', machineId: 'machine-a' }
+            }),
+            makeSession({
+                id: 'active-thinking',
+                active: true,
+                thinking: true,
+                metadata: { path: '/work/thinking', machineId: 'machine-a' }
+            })
+        ])
+
+        expect(Object.fromEntries(groups.map(group => [group.directory, group.hasThinkingSession]))).toEqual({
+            '/work/active': false,
+            '/work/thinking': true,
+            '/work/inactive': false
+        })
     })
 })
 
