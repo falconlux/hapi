@@ -34,6 +34,7 @@ const harness = vi.hoisted(() => ({
     startTurnThreadIds: [] as string[],
     startTurnParams: [] as Array<Record<string, unknown>>,
     startTurnErrors: [] as Error[],
+    steerTurnCalls: [] as Array<{ threadId: string; expectedTurnId: string; message: string }>,
     interruptedTurns: [] as Array<{ threadId: string; turnId: string }>,
     interruptErrors: [] as Error[],
     rollbackCalls: [] as Array<{ threadId: string; numTurns: number }>,
@@ -45,6 +46,7 @@ const harness = vi.hoisted(() => ({
     goal: null as Record<string, unknown> | null,
     suppressGoalNotifications: false,
     suppressTurnCompletion: false,
+    completeTurnOnSteer: false,
     remainingThreadSystemErrors: 0,
     emitFailedCompletionAfterThreadSystemError: false,
     emitCyberPolicyAfterThreadSystemError: false,
@@ -994,6 +996,24 @@ vi.mock('./codexAppServerClient', () => {
             return { turn: { id: turnId } };
         }
 
+        async steerTurn(params?: { threadId?: string; expectedTurnId?: string; input?: Array<{ text?: string }> }): Promise<{ turnId: string }> {
+            const threadId = params?.threadId ?? 'thread-unknown';
+            const expectedTurnId = params?.expectedTurnId ?? 'turn-unknown';
+            harness.steerTurnCalls.push({
+                threadId,
+                expectedTurnId,
+                message: params?.input?.[0]?.text ?? ''
+            });
+
+            if (harness.completeTurnOnSteer) {
+                const completed = { status: 'Completed', turn: { id: expectedTurnId } };
+                harness.notifications.push({ method: 'turn/completed', params: completed });
+                this.notificationHandler?.('turn/completed', completed);
+            }
+
+            return { turnId: expectedTurnId };
+        }
+
         async interruptTurn(params?: { threadId?: string; turnId?: string }): Promise<Record<string, never>> {
             const threadId = params?.threadId ?? 'thread-unknown';
             const turnId = params?.turnId ?? 'turn-unknown';
@@ -1218,6 +1238,7 @@ describe('codexRemoteLauncher', () => {
         harness.startTurnThreadIds = [];
         harness.startTurnParams = [];
         harness.startTurnErrors = [];
+        harness.steerTurnCalls = [];
         harness.interruptedTurns = [];
         harness.interruptErrors = [];
         harness.rollbackCalls = [];
@@ -1229,6 +1250,7 @@ describe('codexRemoteLauncher', () => {
         harness.goal = null;
         harness.suppressGoalNotifications = false;
         harness.suppressTurnCompletion = false;
+        harness.completeTurnOnSteer = false;
         harness.emitFailedCompletionAfterThreadSystemError = false;
         harness.emitCyberPolicyAfterThreadSystemError = false;
         harness.emitSafetyBuffering = false;
@@ -1644,6 +1666,23 @@ describe('codexRemoteLauncher', () => {
                 })
             })
         ]));
+    });
+
+    it('steers a running turn instead of starting a second turn', async () => {
+        harness.suppressTurnCompletion = true;
+        harness.completeTurnOnSteer = true;
+        const { session } = createSessionStub(['first message', 'change direction']);
+
+        const exitReason = await codexRemoteLauncher(session as never);
+
+        expect(exitReason).toBe('exit');
+        expect(harness.startTurnMessages).toEqual(['first message']);
+        expect(harness.steerTurnCalls).toEqual([{
+            threadId: 'thread-1',
+            expectedTurnId: 'turn-1',
+            message: 'change direction'
+        }]);
+        expect(session.thinking).toBe(false);
     });
 
     it('does not emit ready when a goal command interrupts an active turn', async () => {

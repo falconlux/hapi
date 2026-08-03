@@ -21,6 +21,8 @@ import type {
     ThreadReadResponse,
     TurnStartParams,
     TurnStartResponse,
+    TurnSteerParams,
+    TurnSteerResponse,
     TurnInterruptParams,
     TurnInterruptResponse,
     ThreadRollbackParams,
@@ -321,6 +323,14 @@ export class CodexAppServerClient extends JsonLineParser {
             timeoutMs: CodexAppServerClient.DEFAULT_TIMEOUT_MS
         });
         return response as TurnStartResponse;
+    }
+
+    async steerTurn(params: TurnSteerParams, options?: { signal?: AbortSignal }): Promise<TurnSteerResponse> {
+        const response = await this.sendRequest('turn/steer', params, {
+            signal: options?.signal,
+            timeoutMs: 30_000
+        });
+        return response as TurnSteerResponse;
     }
 
     async interruptTurn(params: TurnInterruptParams): Promise<TurnInterruptResponse> {

@@ -1586,6 +1586,14 @@ export function HappyComposer(props: {
     )
     const showAbortButton = true
     const voiceEnabled = Boolean(effectiveVoiceToggle)
+    const composerPlaceholder = (mentionsEnabled: boolean) => t(
+        agentFlavor === 'codex' && thinking
+            ? 'composer.guideRunning'
+            : resolveComposerPlaceholderKey({
+                richMentionsEnabled: mentionsEnabled,
+                showContinueHint,
+            })
+    )
 
     // Pi: selected model info for UI labels and thinking level filtering
     const piModelLabel = agentFlavor === 'pi'
@@ -2213,10 +2221,7 @@ export function HappyComposer(props: {
                                         ref={richInputRef}
                                         value={composerText}
                                         autoFocus={!controlsDisabled && !isTouch}
-                                        placeholder={t(resolveComposerPlaceholderKey({
-                                            richMentionsEnabled: true,
-                                            showContinueHint,
-                                        }))}
+                                        placeholder={composerPlaceholder(true)}
                                         disabled={controlsDisabled}
                                         onValueChange={handleRichValueChange}
                                         onMirrorChange={handleRichMirrorChange}
@@ -2247,10 +2252,7 @@ export function HappyComposer(props: {
                                     onPaste={handlePaste}
                                 >
                                     <textarea
-                                        placeholder={t(resolveComposerPlaceholderKey({
-                                            richMentionsEnabled: false,
-                                            showContinueHint,
-                                        }))}
+                                        placeholder={composerPlaceholder(false)}
                                         disabled={controlsDisabled}
                                         className="h-full min-h-0 flex-1 resize-none overflow-y-auto bg-transparent text-base leading-snug text-[var(--app-fg)] placeholder-[var(--app-hint)] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                     />
@@ -2259,10 +2261,7 @@ export function HappyComposer(props: {
                                 <ComposerPrimitive.Input
                                     ref={textareaRef}
                                     autoFocus={!controlsDisabled && !isTouch}
-                                    placeholder={t(resolveComposerPlaceholderKey({
-                                        richMentionsEnabled: false,
-                                        showContinueHint,
-                                    }))}
+                                    placeholder={composerPlaceholder(false)}
                                     disabled={controlsDisabled}
                                     maxRows={5}
                                     submitOnEnter={false}

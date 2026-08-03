@@ -3662,9 +3662,11 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             const isRetryMessage = Boolean(message);
             pending = null;
             if (!message) {
-                sameThreadRetryAttempt = 0;
-                sameThreadCompactAttempt = 0;
-                activeMessage = null;
+                if (!turnInFlight && !recoveryInFlight) {
+                    sameThreadRetryAttempt = 0;
+                    sameThreadCompactAttempt = 0;
+                    activeMessage = null;
+                }
                 const waitSignal = this.abortController.signal;
                 const batch = await session.queue.waitForMessagesAndGetAsString(waitSignal);
                 if (!batch) {
@@ -3685,7 +3687,6 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             if (!isRetryMessage) {
                 messageBuffer.addMessage(message.message, 'user');
             }
-            activeMessage = message;
             const isGoalCommand = parseGoalCommand(message.message) !== null;
             let suppressReadyAfterMessage = isGoalCommand;
             if (isGoalCommand) {
@@ -3701,6 +3702,49 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 if (await handleSpecialCommand(message)) {
                     continue;
                 }
+
+                if (turnInFlight) {
+                    const threadId = this.currentThreadId;
+                    const turnId = this.currentTurnId;
+                    if (threadId && turnId) {
+                        try {
+                            await appServerClient.steerTurn({
+                                threadId,
+                                expectedTurnId: turnId,
+                                input: [{ type: 'text', text: message.message }]
+                            }, {
+                                signal: this.abortController.signal
+                            });
+                            const activeMessageSnapshot = activeMessage as QueuedMessage | null;
+                            if (turnInFlight && this.currentTurnId === turnId && activeMessageSnapshot) {
+                                activeMessage = {
+                                    ...activeMessageSnapshot,
+                                    message: `${activeMessageSnapshot.message}\n${message.message}`
+                                };
+                            }
+                            logger.debug(`[Codex] Steered active turn ${turnId}`);
+                            continue;
+                        } catch (error) {
+                            logger.debug(`[Codex] Active turn ${turnId} could not be steered; queueing for next turn`, error);
+                            pending = message;
+                            sendVisibleStatus('Current Codex run could not accept guidance; queued for the next run.');
+                            await waitForTurnOrRecovery(this.abortController.signal);
+                            continue;
+                        }
+                    }
+
+                    pending = message;
+                    await waitForTurnOrRecovery(this.abortController.signal);
+                    continue;
+                }
+
+                if (recoveryInFlight) {
+                    pending = message;
+                    await waitForTurnOrRecovery(this.abortController.signal);
+                    continue;
+                }
+
+                activeMessage = message;
 
                 if (!hasThread) {
                     const threadParams = buildThreadStartParams({
