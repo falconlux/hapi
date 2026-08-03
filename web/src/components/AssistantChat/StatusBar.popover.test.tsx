@@ -8,7 +8,7 @@ describe('StatusBar context details popover', () => {
         localStorage.clear()
     })
 
-    it('keeps stable connection labels in English and offsets the whole left status', () => {
+    it('localizes connection labels and offsets the whole left status', () => {
         localStorage.setItem('hapi-lang', 'zh-CN')
         const { rerender } = render(
             <I18nProvider>
@@ -16,7 +16,7 @@ describe('StatusBar context details popover', () => {
             </I18nProvider>
         )
 
-        const onlineLabel = screen.getByText('online')
+        const onlineLabel = screen.getByText('在线')
         expect(onlineLabel.className.split(' ')).not.toContain('top-px')
         expect(onlineLabel.previousElementSibling?.className.split(' ')).not.toContain('top-px')
         expect(onlineLabel.parentElement?.className.split(' ')).toContain('top-px')
@@ -28,7 +28,7 @@ describe('StatusBar context details popover', () => {
             </I18nProvider>
         )
 
-        const offlineLabel = screen.getByText('offline')
+        const offlineLabel = screen.getByText('离线')
         expect(offlineLabel.className.split(' ')).toContain('text-[#999]')
         expect(offlineLabel.className.split(' ')).not.toContain('top-px')
         expect(offlineLabel.previousElementSibling?.className.split(' ')).toContain('bg-[#999]')
@@ -183,7 +183,7 @@ describe('StatusBar context details popover', () => {
             </I18nProvider>
         )
 
-        const connectionLabel = screen.getByText('online')
+        const connectionLabel = screen.getByText('在线')
         const leftStatusGroup = connectionLabel.parentElement?.parentElement
         const statusBar = leftStatusGroup?.parentElement
         const rightStatusGroup = statusBar?.lastElementChild
