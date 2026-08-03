@@ -10,6 +10,9 @@ describe('Codex system prompt', () => {
         expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('simple, local, or routine requests');
         expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('act directly with minimal analysis');
         expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('Reserve deep or exhaustive reasoning for genuinely complex work');
+        expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('Even when the configured reasoning effort is high');
+        expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('keep the reasoning tightly focused on the user\'s current objective');
+        expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('not on broadening the task, exploring unrelated areas, inventing extra requirements, or over-engineering');
         expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('Escalate to deeper analysis only when evidence reveals hidden complexity');
         expect(ADAPTIVE_REASONING_INSTRUCTION).toContain("reasoning-summary titles in the language of the user's latest message");
         expect(ADAPTIVE_REASONING_INSTRUCTION).toContain('never expose hidden chain-of-thought');
