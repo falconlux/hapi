@@ -1082,7 +1082,8 @@ function createMode(): EnhancedMode {
 function createSessionStub(
     messages = ['hello from launcher test'],
     mode = createMode(),
-    isolateMessages = false
+    isolateMessages = false,
+    closeQueue = true
 ) {
     const queue = new MessageQueue2<EnhancedMode>((mode) => JSON.stringify(mode));
     messages.forEach((message, index) => {
@@ -1094,7 +1095,9 @@ function createSessionStub(
             queue.push(message, mode);
         }
     });
-    queue.close();
+    if (closeQueue) {
+        queue.close();
+    }
 
     const sessionEvents: Array<{ type: string; [key: string]: unknown }> = [];
     const codexMessages: unknown[] = [];
@@ -1683,6 +1686,34 @@ describe('codexRemoteLauncher', () => {
             expectedTurnId: 'turn-1',
             message: 'change direction'
         }]);
+        expect(session.thinking).toBe(false);
+    });
+
+    it('wakes a running turn when guidance arrives after the turn has started', async () => {
+        harness.suppressTurnCompletion = true;
+        harness.completeTurnOnSteer = true;
+        const mode = createMode();
+        const { session } = createSessionStub(['first message'], mode, false, false);
+
+        const launcher = codexRemoteLauncher(session as never);
+        await vi.waitFor(() => {
+            expect(session.thinking).toBe(true);
+            expect(harness.startTurnMessages).toEqual(['first message']);
+        });
+
+        session.queue.push('live guidance', mode);
+
+        await vi.waitFor(() => {
+            expect(harness.steerTurnCalls).toEqual([{
+                threadId: 'thread-1',
+                expectedTurnId: 'turn-1',
+                message: 'live guidance'
+            }]);
+        });
+
+        session.queue.close();
+        await expect(launcher).resolves.toBe('exit');
+        expect(harness.startTurnMessages).toEqual(['first message']);
         expect(session.thinking).toBe(false);
     });
 

@@ -3689,6 +3689,12 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             return true;
         };
 
+        // While a Codex turn is active the main loop waits on
+        // waitForTurnOrRecovery() instead of MessageQueue2's waiter. Wake that
+        // loop as soon as a new web message reaches the queue so it can be sent
+        // through turn/steer immediately rather than sitting there until the
+        // current turn completes.
+        session.queue.setOnMessage(() => wakeLoop());
         while (!this.shouldExit) {
             logActiveHandles('loop-top');
             if (!pending && recoveryInFlight) {
@@ -4008,6 +4014,7 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 logActiveHandles('after-turn');
             }
         }
+        session.queue.setOnMessage(null);
 
         failPendingAgentStarts('spawn_agent did not return an agent id before the Codex session ended');
         clearDeferredThreadStatusFailure();
@@ -4019,6 +4026,7 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
 
     protected async cleanup(): Promise<void> {
         logger.debug('[codex-remote]: cleanup start');
+        this.session.queue.setOnMessage(null);
         this.appServerClient.setStderrHandler(null);
         try {
             await this.appServerClient.disconnect();
