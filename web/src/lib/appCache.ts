@@ -1,9 +1,11 @@
 import { clearPersistedMessageWindowStorage } from '@/lib/message-window-storage'
+import { clearScrollRestorationStorage } from '@/lib/scrollStorageGuard'
 
 type CacheStorageAccess = Pick<CacheStorage, 'keys' | 'delete'>
 
 export type ClearAppCacheOptions = {
     cacheStorage?: CacheStorageAccess | null
+    localStorage?: Storage | null
     sessionStorage?: Storage | null
     reload?: () => void
 }
@@ -24,8 +26,17 @@ function getSessionStorage(): Storage | null {
     }
 }
 
+function getLocalStorage(): Storage | null {
+    try {
+        return typeof globalThis.localStorage === 'undefined' ? null : globalThis.localStorage
+    } catch {
+        return null
+    }
+}
+
 export async function clearAppCacheAndReload(options: ClearAppCacheOptions = {}): Promise<void> {
     const cacheStorage = options.cacheStorage === undefined ? getCacheStorage() : options.cacheStorage
+    const localStorage = options.localStorage === undefined ? getLocalStorage() : options.localStorage
     const sessionStorage = options.sessionStorage === undefined ? getSessionStorage() : options.sessionStorage
 
     if (cacheStorage) {
@@ -36,6 +47,7 @@ export async function clearAppCacheAndReload(options: ClearAppCacheOptions = {})
     if (sessionStorage) {
         clearPersistedMessageWindowStorage(sessionStorage)
     }
+    clearScrollRestorationStorage([localStorage, sessionStorage])
 
     const reload = options.reload ?? (() => window.location.reload())
     reload()
