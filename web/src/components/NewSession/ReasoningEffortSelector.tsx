@@ -22,9 +22,11 @@ export function ReasoningEffortSelector(props: {
             value: option.value ?? 'default',
             label: option.label
         }))
-        : CODEX_REASONING_EFFORT_OPTIONS.filter(
-            (option) => props.agent === 'opencode' ? option.value !== 'xhigh' : option.value !== 'max'
-        )
+        : props.agent === 'opencode'
+            ? CODEX_REASONING_EFFORT_OPTIONS.filter(
+                (option) => option.value !== 'xhigh' && option.value !== 'ultra'
+            )
+            : CODEX_REASONING_EFFORT_OPTIONS
 
     return (
         <div className="flex flex-col gap-1.5 px-3 py-3">

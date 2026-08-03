@@ -8,7 +8,9 @@ describe('getCodexComposerReasoningEffortOptions', () => {
             { value: 'low', label: 'Low' },
             { value: 'medium', label: 'Medium' },
             { value: 'high', label: 'High' },
-            { value: 'xhigh', label: 'XHigh' }
+            { value: 'xhigh', label: 'XHigh' },
+            { value: 'max', label: 'Max' },
+            { value: 'ultra', label: 'Ultra' }
         ])
     })
 
@@ -19,7 +21,9 @@ describe('getCodexComposerReasoningEffortOptions', () => {
             { value: 'low', label: 'Low' },
             { value: 'medium', label: 'Medium' },
             { value: 'high', label: 'High' },
-            { value: 'xhigh', label: 'XHigh' }
+            { value: 'xhigh', label: 'XHigh' },
+            { value: 'max', label: 'Max' },
+            { value: 'ultra', label: 'Ultra' }
         ])
     })
 
@@ -44,15 +48,15 @@ describe('getCodexComposerReasoningEffortOptions', () => {
         ])
     })
 
-    it('keeps an unsupported current Codex effort visible', () => {
+    it('always exposes max and ultra for Codex even when the catalog omits them', () => {
         expect(getCodexComposerReasoningEffortOptions('ultra', 'codex', [
             { value: 'low' },
             { value: 'max' }
         ])).toEqual([
             { value: null, label: 'Default' },
-            { value: 'ultra', label: 'Ultra' },
             { value: 'low', label: 'Low' },
-            { value: 'max', label: 'Max' }
+            { value: 'max', label: 'Max' },
+            { value: 'ultra', label: 'Ultra' }
         ])
     })
 

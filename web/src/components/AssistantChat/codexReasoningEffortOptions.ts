@@ -8,7 +8,8 @@ export type ComposerReasoningEffortSourceOption = {
     name?: string
 }
 
-const CODEX_REASONING_EFFORT_PRESETS = ['low', 'medium', 'high', 'xhigh'] as const
+const CODEX_REASONING_EFFORT_PRESETS = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] as const
+const CODEX_ALWAYS_AVAILABLE_REASONING_EFFORTS = ['max', 'ultra'] as const
 const CODEX_REASONING_EFFORT_LABELS: Record<string, string> = {
     low: 'Low',
     medium: 'Medium',
@@ -34,9 +35,17 @@ function formatCodexReasoningEffortLabel(effort: string): string {
 
 function buildDynamicReasoningEffortOptions(
     currentEffort: string | null,
-    dynamicOptions: ComposerReasoningEffortSourceOption[]
+    dynamicOptions: ComposerReasoningEffortSourceOption[],
+    alwaysAvailableOptions: readonly string[] = []
 ): CodexComposerReasoningEffortOption[] {
-    const optionValues = new Set(dynamicOptions.map((option) => option.value))
+    const mergedDynamicOptions = [...dynamicOptions]
+    const optionValues = new Set(mergedDynamicOptions.map((option) => option.value))
+    for (const value of alwaysAvailableOptions) {
+        if (!optionValues.has(value)) {
+            mergedDynamicOptions.push({ value })
+            optionValues.add(value)
+        }
+    }
     const options: CodexComposerReasoningEffortOption[] = [
         { value: null, label: 'Default' }
     ]
@@ -48,7 +57,7 @@ function buildDynamicReasoningEffortOptions(
         })
     }
 
-    options.push(...dynamicOptions.map((option) => ({
+    options.push(...mergedDynamicOptions.map((option) => ({
         value: option.value,
         label: option.name ?? formatCodexReasoningEffortLabel(option.value)
     })))
@@ -71,7 +80,11 @@ export function getCodexComposerReasoningEffortOptions(
     }
 
     if (dynamicOptions && dynamicOptions.length > 0) {
-        return buildDynamicReasoningEffortOptions(normalizedCurrentEffort, dynamicOptions)
+        return buildDynamicReasoningEffortOptions(
+            normalizedCurrentEffort,
+            dynamicOptions,
+            CODEX_ALWAYS_AVAILABLE_REASONING_EFFORTS
+        )
     }
 
     const options: CodexComposerReasoningEffortOption[] = [
