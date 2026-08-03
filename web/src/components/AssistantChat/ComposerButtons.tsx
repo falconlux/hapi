@@ -478,6 +478,7 @@ export function UnifiedButton(props: {
     onSend: (intent?: ComposerSendIntent) => void
     onVoiceToggle: () => void
     voiceLabel?: string
+    sendLabel?: string
     /**
      * When true, the send button repaints amber and the aria-label
      * announces "Send to scratchlist" instead of "Send message". The
@@ -552,7 +553,7 @@ export function UnifiedButton(props: {
     } else if (hasText) {
         icon = <SendIcon />
         className = 'bg-black text-white'
-        ariaLabel = t('composer.send')
+        ariaLabel = props.sendLabel ?? t('composer.send')
     } else if (props.voiceEnabled) {
         icon = <VoiceAssistantIcon />
         className = 'bg-black text-white'
@@ -560,7 +561,7 @@ export function UnifiedButton(props: {
     } else {
         icon = <SendIcon />
         className = 'bg-[#C0C0C0] text-white'
-        ariaLabel = t('composer.send')
+        ariaLabel = props.sendLabel ?? t('composer.send')
     }
 
     // When the submission routes to scratchlist the send button is the
@@ -645,6 +646,7 @@ export function ComposerButtons(props: {
     voiceMicMuted?: boolean
     onVoiceToggle: () => void
     onVoiceMicToggle?: () => void
+    sendLabel?: string
     onSend: (intent?: ComposerSendIntent) => void
     pendingSchedule?: PendingSchedule | null
     onSchedule?: (pending: PendingSchedule) => void
@@ -908,6 +910,7 @@ export function ComposerButtons(props: {
                 voiceStatus={props.voiceStatus}
                 voiceEnabled={props.voiceEnabled}
                 controlsDisabled={props.controlsDisabled}
+                sendLabel={props.sendLabel}
                 onSend={props.onSend}
                 onVoiceToggle={props.onVoiceToggle}
                 voiceLabel={props.dictationEnabled ? t('composer.dictate') : undefined}

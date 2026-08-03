@@ -596,6 +596,7 @@ export default {
   'composer.collapse': '收起消息编辑器',
   'composer.dropToAttach': '松开以添加文件',
   'composer.send': '发送',
+  'composer.steer': '引导当前执行',
   'composer.guideRunning': '输入消息，引导当前 Codex 执行…',
   'composer.stop': '停止',
   'composer.voice': '语音助手',

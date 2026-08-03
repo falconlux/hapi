@@ -3,6 +3,7 @@ export const CLAUDE_MODEL_LABELS = {
     'sonnet[1m]': 'Sonnet 1M',
     opus: 'Opus',
     'opus[1m]': 'Opus 1M',
+    'claude-opus-5': 'Opus 5',
     fable: 'Fable',
     'fable[1m]': 'Fable 1M'
 } as const

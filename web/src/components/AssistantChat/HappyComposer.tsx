@@ -1627,8 +1627,9 @@ export function HappyComposer(props: {
     )
     const showAbortButton = true
     const voiceEnabled = Boolean(effectiveVoiceToggle)
+    const isCodexSteer = agentFlavor === 'codex' && thinking
     const composerPlaceholder = (mentionsEnabled: boolean) => t(
-        agentFlavor === 'codex' && thinking
+        isCodexSteer
             ? 'composer.guideRunning'
             : resolveComposerPlaceholderKey({
                 richMentionsEnabled: mentionsEnabled,
@@ -2355,6 +2356,7 @@ export function HappyComposer(props: {
                             voiceMicMuted={dictationActive ? false : voiceMicMuted}
                             onVoiceToggle={effectiveVoiceToggle ?? (() => {})}
                             onVoiceMicToggle={dictationActive ? undefined : onVoiceMicToggle}
+                            sendLabel={isCodexSteer ? t('composer.steer') : undefined}
                             onSend={handleSend}
                             allowQueueGesture={canQueueSend}
                             pendingSchedule={pendingSchedule}

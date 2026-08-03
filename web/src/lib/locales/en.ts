@@ -597,6 +597,7 @@ export default {
   'composer.collapse': 'Collapse message editor',
   'composer.dropToAttach': 'Drop to attach',
   'composer.send': 'Send',
+  'composer.steer': 'Guide current run',
   'composer.guideRunning': 'Guide the current Codex run...',
   'composer.stop': 'Stop',
   'composer.voice': 'Voice assistant',

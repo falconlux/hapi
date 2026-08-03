@@ -29,7 +29,10 @@ export function useCodexModels(args: {
         },
         enabled,
         staleTime: 30_000,
-        retry: false,
+        // One transient runner/proxy failure should not disable the selector
+        // until the user reloads the whole application.
+        retry: 1,
+        retryDelay: 1_000,
     })
 
     return {

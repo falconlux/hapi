@@ -105,6 +105,22 @@ describe('UnifiedButton — routesToScratchlist visual state', () => {
         const btn = getButton('Send')
         expect(btn.className).not.toContain('bg-amber-500')
     })
+
+    it('announces a custom send action while guiding a running turn', () => {
+        renderInProviders(
+            <UnifiedButton
+                canSend
+                voiceStatus="disconnected"
+                voiceEnabled={false}
+                controlsDisabled={false}
+                onSend={noop}
+                onVoiceToggle={noop}
+                sendLabel="Guide current run"
+            />,
+        )
+
+        expect(getButton('Guide current run')).toBeInTheDocument()
+    })
 })
 
 describe('UnifiedButton — touch queue gesture', () => {
