@@ -36,8 +36,10 @@ import type {
     ThreadGoalClearParams,
     ThreadGoalClearResponse,
     ExperimentalFeatureEnablementSetParams,
-    ExperimentalFeatureEnablementSetResponse
+    ExperimentalFeatureEnablementSetResponse,
+    McpServerRefreshResponse
 } from './appServerTypes';
+import { McpConfigHotReloader } from './utils/mcpConfigHotReload';
 
 type JsonRpcLiteRequest = {
     id: number;
@@ -200,6 +202,7 @@ export class CodexAppServerClient extends JsonLineParser {
     private notificationHandler: ((method: string, params: unknown) => void) | null = null;
     private stderrHandler: ((text: string) => void) | null = null;
     private protocolError: Error | null = null;
+    private mcpConfigHotReloader: McpConfigHotReloader | null = null;
 
     static readonly DEFAULT_TIMEOUT_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -245,6 +248,7 @@ export class CodexAppServerClient extends JsonLineParser {
             logger.debug(message);
             this.rejectAllPending(new Error(message));
             this.connected = false;
+            this.stopMcpConfigHotReload();
             this.resetParserState();
             this.process = null;
         });
@@ -257,6 +261,7 @@ export class CodexAppServerClient extends JsonLineParser {
                 { cause: error }
             ));
             this.connected = false;
+            this.stopMcpConfigHotReload();
             this.resetParserState();
             this.process = null;
         });
@@ -276,7 +281,15 @@ export class CodexAppServerClient extends JsonLineParser {
     async initialize(params: InitializeParams): Promise<InitializeResponse> {
         const response = await this.sendRequest('initialize', params, { timeoutMs: 30_000 });
         this.sendNotification('initialized');
+        this.startMcpConfigHotReload();
         return response as InitializeResponse;
+    }
+
+    async reloadMcpServers(): Promise<McpServerRefreshResponse> {
+        const response = await this.sendRequest('config/mcpServer/reload', undefined, {
+            timeoutMs: 30_000
+        });
+        return response as McpServerRefreshResponse;
     }
 
     async listModels(params?: ModelListParams): Promise<ModelListResponse> {
@@ -432,6 +445,7 @@ export class CodexAppServerClient extends JsonLineParser {
     }
 
     async disconnect(): Promise<void> {
+        this.stopMcpConfigHotReload();
         if (!this.connected) {
             return;
         }
@@ -453,6 +467,22 @@ export class CodexAppServerClient extends JsonLineParser {
         }
 
         logger.debug('[CodexAppServer] Disconnected');
+    }
+
+    private startMcpConfigHotReload(): void {
+        this.stopMcpConfigHotReload();
+        this.mcpConfigHotReloader = new McpConfigHotReloader({
+            reload: async () => {
+                if (!this.connected) return;
+                await this.reloadMcpServers();
+            }
+        });
+        this.mcpConfigHotReloader.start();
+    }
+
+    private stopMcpConfigHotReload(): void {
+        this.mcpConfigHotReloader?.stop();
+        this.mcpConfigHotReloader = null;
     }
 
     private async sendRequest(

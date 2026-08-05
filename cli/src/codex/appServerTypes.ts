@@ -366,3 +366,5 @@ export interface ExperimentalFeatureEnablementSetResponse {
     enablement: Record<string, boolean>;
     [key: string]: unknown;
 }
+
+export type McpServerRefreshResponse = Record<string, never>;
