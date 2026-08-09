@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { CLAUDE_MODEL_PRESETS, getClaudeModelLabel } from '@hapi/protocol'
 import { getModelOptionsForFlavor, getNextModelForFlavor } from './modelOptions'
+
+const claudePresetOptions = CLAUDE_MODEL_PRESETS.map((model) => ({
+    value: model,
+    label: getClaudeModelLabel(model) ?? model
+}))
 
 describe('getModelOptionsForFlavor', () => {
     it('never offers the unsupported default reset in an active AGY session', () => {
@@ -36,13 +42,7 @@ describe('getModelOptionsForFlavor', () => {
         ])
         expect(options).toEqual([
             { value: null, label: 'Default' },
-            { value: 'sonnet', label: 'Sonnet' },
-            { value: 'sonnet[1m]', label: 'Sonnet 1M' },
-            { value: 'opus', label: 'Opus' },
-            { value: 'opus[1m]', label: 'Opus 1M' },
-            { value: 'claude-opus-5', label: 'Opus 5' },
-            { value: 'fable', label: 'Fable' },
-            { value: 'fable[1m]', label: 'Fable 1M' }
+            ...claudePresetOptions
         ])
     })
 
@@ -53,13 +53,7 @@ describe('getModelOptionsForFlavor', () => {
         expect(options).toEqual([
             { value: null, label: 'Default' },
             { value: 'claude-opus-4-1-20250805', label: 'Claude Opus 4.1' },
-            { value: 'sonnet', label: 'Sonnet' },
-            { value: 'sonnet[1m]', label: 'Sonnet 1M' },
-            { value: 'opus', label: 'Opus' },
-            { value: 'opus[1m]', label: 'Opus 1M' },
-            { value: 'claude-opus-5', label: 'Opus 5' },
-            { value: 'fable', label: 'Fable' },
-            { value: 'fable[1m]', label: 'Fable 1M' }
+            ...claudePresetOptions
         ])
     })
 
