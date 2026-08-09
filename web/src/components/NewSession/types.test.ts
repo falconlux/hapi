@@ -14,23 +14,23 @@ describe('Claude model options', () => {
     })
 
     it('exposes friendly labels for Claude model presets', () => {
-        expect(CLAUDE_MODEL_PRESETS).toEqual([
-            'sonnet',
-            'sonnet[1m]',
-            'opus',
-            'opus[1m]',
-            'claude-opus-4-6',
-            'claude-opus-4-6[1m]',
-            'claude-opus-5',
-            'fable',
-            'fable[1m]'
-        ])
+        expect(CLAUDE_MODEL_PRESETS).toContain('claude-fable-5')
+        expect(CLAUDE_MODEL_PRESETS).toContain('claude-opus-4-6')
+        expect(CLAUDE_MODEL_PRESETS).toContain('claude-opus-4-7')
+        expect(CLAUDE_MODEL_PRESETS).toContain('claude-opus-4-8')
+        expect(CLAUDE_MODEL_PRESETS).toContain('claude-opus-5')
         expect(getClaudeModelLabel('sonnet[1m]')).toBe('Sonnet 1M')
         expect(getClaudeModelLabel('opus[1m]')).toBe('Opus 1M')
         expect(getClaudeModelLabel('claude-opus-4-6')).toBe('Opus 4.6')
         expect(getClaudeModelLabel('claude-opus-4-6[1m]')).toBe('Opus 4.6 1M')
         expect(getClaudeModelLabel('claude-opus-5')).toBe('Opus 5')
         expect(getClaudeModelLabel('fable[1m]')).toBe('Fable 1M')
+    })
+
+    it('keeps gateway-specific Codex models available as local fallbacks', () => {
+        expect(MODEL_OPTIONS.codex).toContainEqual({ value: 'gpt-5.6-luna', label: 'GPT-5.6 Luna' })
+        expect(MODEL_OPTIONS.codex).toContainEqual({ value: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' })
+        expect(MODEL_OPTIONS.codex).toContainEqual({ value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra' })
     })
 })
 

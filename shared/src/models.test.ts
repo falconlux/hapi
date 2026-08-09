@@ -29,10 +29,13 @@ describe('isClaudeModelPreset', () => {
 describe('getClaudeModelLabel', () => {
     test('returns label for known presets', () => {
         expect(getClaudeModelLabel('sonnet')).toBe('Sonnet')
+        expect(getClaudeModelLabel('claude-fable-5')).toBe('Fable 5')
         expect(getClaudeModelLabel('opus')).toBe('Opus')
         expect(getClaudeModelLabel('opus[1m]')).toBe('Opus 1M')
         expect(getClaudeModelLabel('claude-opus-4-6')).toBe('Opus 4.6')
         expect(getClaudeModelLabel('claude-opus-4-6[1m]')).toBe('Opus 4.6 1M')
+        expect(getClaudeModelLabel('claude-opus-4-7')).toBe('Opus 4.7')
+        expect(getClaudeModelLabel('claude-opus-4-8')).toBe('Opus 4.8')
         expect(getClaudeModelLabel('claude-opus-5')).toBe('Opus 5')
     })
 

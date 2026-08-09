@@ -31,6 +31,7 @@ import {
 } from '@/lib/codexModelCapabilities'
 import { createSerialAsyncQueue } from '@/lib/serialAsyncQueue'
 import { HappyComposer, type ComposerSendError } from '@/components/AssistantChat/HappyComposer'
+import { MODEL_OPTIONS } from '@/components/NewSession/types'
 import { codexModelAdvertisesFastTier, getEffectiveCodexServiceTier } from '@/components/AssistantChat/codexFastMode'
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import { resolvePendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
@@ -867,6 +868,12 @@ function SessionChatInner(props: SessionChatProps) {
                 value: codexModel.id,
                 label: codexModel.displayName
             })
+        }
+        const seen = new Set(options.map((option) => option.value)
+            .filter((value): value is string => value !== null))
+        for (const preset of MODEL_OPTIONS.codex) {
+            if (preset.value === 'auto' || seen.has(preset.value)) continue
+            options.push({ value: preset.value, label: preset.label })
         }
         return options
     }, [agentFlavor, codexModelsState.models])

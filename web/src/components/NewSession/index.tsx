@@ -37,6 +37,7 @@ import {
     shouldRestoreNewSessionFormDraft
 } from './newSessionFormDraft'
 import type { AgentType, LaunchEffort, CodexReasoningEffort, NewSessionServiceTier, SessionType } from './types'
+import { MODEL_OPTIONS } from './types'
 import { ActionButtons } from './ActionButtons'
 import { AgentSelector } from './AgentSelector'
 import { CollaborationModeSelector } from './CollaborationModeSelector'
@@ -292,6 +293,11 @@ export function NewSession(props: {
                 value: codexModel.id,
                 label: codexModel.displayName
             })
+        }
+        const seen = new Set(options.map((option) => option.value))
+        for (const preset of MODEL_OPTIONS.codex) {
+            if (preset.value === 'auto' || seen.has(preset.value)) continue
+            options.push(preset)
         }
         if (model !== 'auto' && !options.some((option) => option.value === model)) {
             options.splice(1, 0, { value: model, label: model })
