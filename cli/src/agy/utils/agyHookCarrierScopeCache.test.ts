@@ -22,11 +22,20 @@ import {
  * observable output on this (Linux) test host is unchanged either way.
  */
 describe('carrier scope cache (Phase 2-B infrastructure)', () => {
+    let restorePlatform: (() => void) | undefined;
+
     beforeEach(() => {
+        const originalPlatform = process.platform;
+        Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+        restorePlatform = () => {
+            Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
+        };
         _resetCarrierScopeCacheForTests();
     });
 
     afterEach(() => {
+        restorePlatform?.();
+        restorePlatform = undefined;
         _resetCarrierScopeCacheForTests();
     });
 
@@ -127,7 +136,7 @@ describe('carrier scope cache (Phase 2-B infrastructure)', () => {
             if (!carrier) return;
             try {
                 const owner = JSON.parse(readFileSync(join(carrier.carrierDir, 'owner.json'), 'utf8'));
-                expect(owner.scope).toBe(computeLocalCarrierScope());
+                expect(owner.scope).toBe(computeLocalCarrierScope() ?? '');
             } finally {
                 cleanupAgyHookCarrier(carrier.carrierDir);
             }

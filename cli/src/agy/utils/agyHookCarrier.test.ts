@@ -204,7 +204,7 @@ describe('agy hook carrier location (Phase 2.8)', () => {
             // recorded under a different scope must never be probed by this
             // host's sweep. See computeLocalCarrierScope's docstring for why
             // hostname alone (the original Fix N6) wasn't enough.
-            expect(owner.scope).toBe(computeLocalCarrierScope());
+            expect(owner.scope).toBe(computeLocalCarrierScope() ?? '');
             // Must not land inside .agents/ — that's the directory agy itself
             // reads (hooks.json, plugins/), and owner metadata is HAPI-only
             // bookkeeping that must not pollute it.
@@ -216,7 +216,9 @@ describe('agy hook carrier location (Phase 2.8)', () => {
 });
 
 describe('computeLocalCarrierScope', () => {
-    it('computes a linux:<bootId>:<nsId> scope from real /proc reads on this (Linux) test host', () => {
+    const itOnLinux = process.platform === 'linux' ? it : it.skip;
+
+    itOnLinux('computes a linux:<bootId>:<nsId> scope from real /proc reads on this (Linux) test host', () => {
         // Non-vacuous: this sandbox's /proc is genuinely readable (verified
         // manually before writing this test), so this pins the real Linux
         // success path, not just the fallback.
@@ -240,6 +242,7 @@ describe('computeLocalCarrierScope', () => {
 });
 
 describe('sweepAgyHookCarriers', () => {
+    const itOnLinux = process.platform === 'linux' ? it : it.skip;
     let previousHapiHome: string | undefined;
     let customHapiHome: string;
 
@@ -275,7 +278,7 @@ describe('sweepAgyHookCarriers', () => {
         return carrierDir;
     }
 
-    it('③ sweeps a carrier whose owner scope matches AND whose process has died', async () => {
+    itOnLinux('③ sweeps a carrier whose owner scope matches AND whose process has died', async () => {
         const deadPid = await spawnAndReapDeadPid();
         const carrierDir = makeCarrierDir('dead-owner-matching-scope');
         writeFileSync(
@@ -567,7 +570,7 @@ describe('sweepAgyHookCarriers', () => {
             expect(existsSync(carrierDir)).toBe(true);
         });
 
-        it('reads the directory listing before resolving the local scope — not just an outcome, the actual call order', async () => {
+        itOnLinux('reads the directory listing before resolving the local scope — not just an outcome, the actual call order', async () => {
             // hostile-review round 1 finding ③: the test above only proves
             // "a carrier created after the snapshot is invisible", which a
             // reversed implementation (resolve scope, THEN readdir) could

@@ -405,6 +405,7 @@ describe('sweepAgyHookCarriers platform branches (Phase 2-B, mutation resistance
 });
 
 describe('real defaultScopeProbe (smoke test, no macOS tooling on this Linux host)', () => {
+    const itOffDarwin = process.platform === 'darwin' ? it.skip : it;
     // This cannot validate the SUCCESS/parsing path against the real OS
     // tools (that needs Phase 3's live macOS verification, out of this
     // task's scope) -- but it does exercise the real execFile-based
@@ -430,7 +431,7 @@ describe('real defaultScopeProbe (smoke test, no macOS tooling on this Linux hos
         _resetCarrierScopeCacheForTests();
     });
 
-    it('resolves to undefined (never hangs, never throws) when stubbed to darwin on a non-macOS host', async () => {
+    itOffDarwin('resolves to undefined (never hangs, never throws) when stubbed to darwin on a non-macOS host', async () => {
         restorePlatform = stubPlatform('darwin');
         await expect(warmCarrierScope()).resolves.toBeUndefined();
 
