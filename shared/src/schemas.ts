@@ -58,6 +58,9 @@ export const MetadataSchema = z.object({
     os: z.string().optional(),
     summary: MetadataSummarySchema.optional(),
     machineId: z.string().optional(),
+    // HAPI session that created/manages this agent session. Used for automatic
+    // checkpoint/completion handoff without exposing hub credentials.
+    managerSessionId: z.string().optional(),
     claudeSessionId: z.string().optional(),
     // Parent HAPI session id when this session was created by message-level fork
     // (`claude --resume <id> --fork-session`). Lets the web list mark the new

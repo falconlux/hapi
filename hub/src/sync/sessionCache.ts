@@ -824,6 +824,30 @@ export class SessionCache {
         throw new Error('Session was modified concurrently while archiving from hub')
     }
 
+    setManagerSession(sessionId: string, managerSessionId: string, namespace: string): void {
+        for (let attempt = 0; attempt < METADATA_RETRY_ATTEMPTS; attempt += 1) {
+            const session = this.getSessionByNamespace(sessionId, namespace) ?? this.refreshSession(sessionId)
+            if (!session || session.namespace !== namespace || !session.metadata) {
+                throw new Error('Created session is not available in this namespace')
+            }
+            if (session.metadata.managerSessionId === managerSessionId) return
+
+            const result = this.store.sessions.updateSessionMetadata(
+                sessionId,
+                { ...session.metadata, managerSessionId },
+                session.metadataVersion,
+                namespace,
+                { touchUpdatedAt: false }
+            )
+            if (result.result === 'error') {
+                throw new Error('Failed to persist manager session link')
+            }
+            this.refreshSession(sessionId)
+            if (result.result === 'success') return
+        }
+        throw new Error('Session was modified concurrently while linking its manager')
+    }
+
     async renameSession(sessionId: string, name: string): Promise<void> {
         // tiann/hapi#919: retry-with-refresh on version-mismatch instead of
         // throwing on the first contention. Mirrors the good pattern in
@@ -1321,6 +1345,10 @@ export class SessionCache {
         }
         if (typeof oldObj.host === 'string' && typeof newObj.host !== 'string') {
             merged.host = oldObj.host
+            changed = true
+        }
+        if (typeof oldObj.managerSessionId === 'string' && typeof newObj.managerSessionId !== 'string') {
+            merged.managerSessionId = oldObj.managerSessionId
             changed = true
         }
         if (typeof oldObj.preferredPermissionMode === 'string' && typeof newObj.preferredPermissionMode !== 'string') {

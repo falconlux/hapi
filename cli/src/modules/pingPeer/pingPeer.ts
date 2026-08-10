@@ -76,6 +76,24 @@ export type ListPeerSessionsOptions = {
     order?: 'updatedAt'
 }
 
+export type CreatePeerAgentSessionOptions = {
+    machineId: string
+    title: string
+    cwd: string
+    initialMessage?: string
+    objective?: string
+    model?: string
+    reasoningEffort?: string
+    managerSessionId?: string
+    apiUrl?: string
+    accessToken?: string
+    http?: AxiosInstance
+}
+
+export type CreatePeerAgentSessionResult = {
+    sessionId: string
+}
+
 const DEFAULT_WAIT_ACTIVE_SECS = 60
 const POLL_ACTIVE_MS = 2_000
 const POLL_PI_READY_MS = 1_000
@@ -378,6 +396,59 @@ export async function listPeerSessions(
         limit: options.limit ?? 200,
         order: options.order ?? 'updatedAt'
     })
+}
+
+export async function createPeerAgentSession(
+    options: CreatePeerAgentSessionOptions
+): Promise<CreatePeerAgentSessionResult> {
+    const machineId = options.machineId?.trim()
+    const title = options.title?.trim()
+    const cwd = options.cwd?.trim()
+    const initialMessage = options.initialMessage?.trim()
+    const objective = options.objective?.trim()
+    if (!machineId) throw new PingPeerError('bad_args', 'machineId is required')
+    if (!title) throw new PingPeerError('bad_args', 'title is required')
+    if (!cwd) throw new PingPeerError('bad_args', 'cwd is required')
+    if (!initialMessage && !objective) {
+        throw new PingPeerError('bad_args', 'initialMessage or objective is required')
+    }
+
+    const apiUrl = resolveApiUrl(options.apiUrl)
+    const accessToken = resolveAccessToken(options.accessToken)
+    const http = options.http ?? axios
+    const jwt = await exchangeJwt(apiUrl, accessToken, http)
+    const response = await http.post(
+        `${apiUrl}/api/machines/${encodeURIComponent(machineId)}/agent-sessions`,
+        {
+            title,
+            cwd,
+            ...(initialMessage ? { initialMessage } : {}),
+            ...(objective ? { objective } : {}),
+            ...(options.model ? { model: options.model } : {}),
+            ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
+            ...(options.managerSessionId ? { managerSessionId: options.managerSessionId } : {})
+        },
+        {
+            headers: authHeaders(jwt),
+            timeout: 45_000,
+            validateStatus: () => true
+        }
+    )
+    if (response.status >= 200 && response.status < 300
+        && response.data?.type === 'success'
+        && typeof response.data?.sessionId === 'string') {
+        return { sessionId: response.data.sessionId }
+    }
+    const detail = typeof response.data?.error === 'string'
+        ? response.data.error
+        : `HTTP ${response.status}`
+    const existingId = typeof response.data?.sessionId === 'string'
+        ? ` (sessionId: ${response.data.sessionId})`
+        : ''
+    throw new PingPeerError(
+        response.data?.code === 'duplicate_agent_session' ? 'ambiguous' : 'send_failed',
+        `create_peer failed: ${detail}${existingId}`
+    )
 }
 
 export type FormatPeerSessionsListOptions = {

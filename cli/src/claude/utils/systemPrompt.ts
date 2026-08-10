@@ -12,6 +12,7 @@ const BASE_SYSTEM_PROMPT = (() => trimIdent(`
     ${DISPLAY_IMAGE_PROMPT_CLAUDE}
     ${DISPLAY_VIDEO_PROMPT_CLAUDE}
     ${DISPLAY_MEDIA_PROMPT_CLAUDE}
+    When the user explicitly asks you to create a separate visible HAPI agent session, call mcp__hapi__create_peer with a title, cwd, and initialMessage/objective. The new session automatically links status notifications back to this chat.
     ${buildSessionCitationSteerInstruction({
         inspectTool: 'mcp__hapi__inspect_peer',
         pingTool: 'mcp__hapi__ping_peer',
