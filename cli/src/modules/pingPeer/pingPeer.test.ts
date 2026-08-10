@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+    createPeerAgentSession,
     PingPeerError,
     exitCodeForPingPeerError,
     pingPeer,
@@ -31,6 +32,69 @@ function createHttpMock(handlers: {
         })
     }
 }
+
+describe('createPeerAgentSession', () => {
+    it('uses the configured hub auth and returns the stable session id', async () => {
+        const http = createHttpMock({
+            post: (url, body) => {
+                if (url.endsWith('/api/auth')) {
+                    return { status: 200, data: { token: 'jwt' } }
+                }
+                if (url.endsWith('/api/machines/machine-1/agent-sessions')) {
+                    expect(body).toEqual({
+                        title: 'Worker',
+                        cwd: '/tmp/project',
+                        objective: 'Implement the task',
+                        model: 'gpt-5.6-sol',
+                        reasoningEffort: 'medium',
+                        managerSessionId: 'manager-1'
+                    })
+                    return { status: 200, data: { type: 'success', sessionId: 'child-1' } }
+                }
+                throw new Error(`unexpected POST ${url}`)
+            }
+        })
+
+        await expect(createPeerAgentSession({
+            machineId: 'machine-1',
+            title: 'Worker',
+            cwd: '/tmp/project',
+            objective: 'Implement the task',
+            model: 'gpt-5.6-sol',
+            reasoningEffort: 'medium',
+            managerSessionId: 'manager-1',
+            apiUrl: 'http://hub.test',
+            accessToken: 'token',
+            http: http as never
+        })).resolves.toEqual({ sessionId: 'child-1' })
+    })
+
+    it('surfaces duplicate protection with the existing session id', async () => {
+        const http = createHttpMock({
+            post: (url) => url.endsWith('/api/auth')
+                ? { status: 200, data: { token: 'jwt' } }
+                : {
+                    status: 409,
+                    data: {
+                        type: 'error',
+                        code: 'duplicate_agent_session',
+                        error: 'already exists',
+                        sessionId: 'existing-1'
+                    }
+                }
+        })
+
+        await expect(createPeerAgentSession({
+            machineId: 'machine-1',
+            title: 'Worker',
+            cwd: '/tmp/project',
+            objective: 'Implement',
+            apiUrl: 'http://hub.test',
+            accessToken: 'token',
+            http: http as never
+        })).rejects.toThrow(/existing-1/)
+    })
+})
 
 describe('resolveSessionByPrefix', () => {
     const sessions: PingPeerSessionSummary[] = [

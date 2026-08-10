@@ -23,7 +23,7 @@ import {
   SESSION_ID_PREFIX_PARAM_DESCRIPTION,
 } from '@hapi/protocol/sessionCitation';
 
-const DEFAULT_TOOL_NAMES = ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'ping_peer', 'inspect_peer'];
+const DEFAULT_TOOL_NAMES = ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer'];
 
 function parseArgs(argv: string[]): { url: string | null; toolNames: Set<string> } {
   let url: string | null = null;
@@ -282,6 +282,41 @@ export async function runHappyMcpStdioBridge(argv: string[]): Promise<void> {
               content: [
                 { type: 'text' as const, text: `Failed to list peers: ${error instanceof Error ? error.message : String(error)}` },
               ],
+              isError: true,
+            };
+          }
+        }
+      );
+    }
+
+    const createPeerInputSchema: z.ZodTypeAny = z.object({
+      title: z.string().trim().min(1).max(255).describe('Visible title for the new HAPI agent session'),
+      cwd: z.string().trim().min(1).describe('Working directory on the current HAPI runner machine'),
+      initialMessage: z.string().trim().min(1).optional().describe('Initial task message for the new agent'),
+      objective: z.string().trim().min(1).optional().describe('Alias for initialMessage'),
+      model: z.string().trim().min(1).optional().describe('Optional Codex model override'),
+      reasoningEffort: z.string().trim().min(1).optional().describe('Optional Codex reasoning effort override'),
+    }).superRefine((value, context) => {
+      if (!value.initialMessage && !value.objective) {
+        context.addIssue({ code: z.ZodIssueCode.custom, message: 'initialMessage or objective is required' });
+      }
+    });
+
+    if (toolNames.has('create_peer')) {
+      server.registerTool<any, any>(
+        'create_peer',
+        {
+          description: 'Create a separate visible Codex HAPI agent session on the current runner and namespace. Returns a stable sessionId and links completion/checkpoint notifications to the caller.',
+          title: 'Create Peer Agent Session',
+          inputSchema: createPeerInputSchema,
+        },
+        async (args: Record<string, unknown>) => {
+          try {
+            const client = await ensureHttpClient();
+            return await client.callTool({ name: 'create_peer', arguments: args }) as any;
+          } catch (error) {
+            return {
+              content: [{ type: 'text' as const, text: `Failed to create peer: ${error instanceof Error ? error.message : String(error)}` }],
               isError: true,
             };
           }

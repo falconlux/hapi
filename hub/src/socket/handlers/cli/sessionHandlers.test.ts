@@ -335,7 +335,7 @@ describe('cli session handlers', () => {
         expect(uuids).toEqual(['msg-1', 'msg-2'])
     })
 
-    it.each(['supersededBySessionId', 'opencodeClearOperation'] as const)(
+    it.each(['supersededBySessionId', 'opencodeClearOperation', 'managerSessionId'] as const)(
         'ignores a forged hub-owned %s addition from CLI metadata',
         (field) => {
             const store = new Store(':memory:')
@@ -351,7 +351,7 @@ describe('cli session handlers', () => {
                 expectedVersion: session.metadataVersion,
                 metadata: {
                     path: '/tmp/project',
-                    [field]: field === 'supersededBySessionId'
+                    [field]: field === 'supersededBySessionId' || field === 'managerSessionId'
                         ? 'foreign-session'
                         : { replacementSessionId: 'foreign-session', state: 'reserved', updatedAt: Date.now() }
                 }

@@ -159,4 +159,23 @@ describe('runHappyMcpStdioBridge tool forwarding', () => {
         ])
     })
 
+    it('registers and forwards create_peer when included in --tools', async () => {
+        await runHappyMcpStdioBridge([
+            '--url',
+            'http://127.0.0.1:43006',
+            '--tools',
+            'create_peer'
+        ])
+
+        const handler = harness.tools.get('create_peer')
+        await expect(handler?.({ title: 'Worker', cwd: '/tmp/repo', objective: 'Implement' })).resolves.toEqual({
+            content: [{ type: 'text', text: 'forwarded' }],
+            isError: false
+        })
+        expect(harness.callTool).toHaveBeenCalledWith({
+            name: 'create_peer',
+            arguments: { title: 'Worker', cwd: '/tmp/repo', objective: 'Implement' }
+        })
+    })
+
 })

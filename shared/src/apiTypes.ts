@@ -587,6 +587,36 @@ export const SpawnSessionRequestSchema = z.object({
 
 export type SpawnSessionRequest = z.infer<typeof SpawnSessionRequestSchema>
 
+export const CreateAgentSessionRequestSchema = z.object({
+    title: z.string().trim().min(1).max(255),
+    cwd: z.string().trim().min(1),
+    initialMessage: z.string().trim().min(1).optional(),
+    objective: z.string().trim().min(1).optional(),
+    model: z.string().trim().min(1).optional(),
+    reasoningEffort: z.string().trim().min(1).optional(),
+    managerSessionId: z.string().trim().min(1).optional()
+}).superRefine((value, context) => {
+    if (!value.initialMessage && !value.objective) {
+        context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'initialMessage or objective is required',
+            path: ['initialMessage']
+        })
+    }
+})
+
+export type CreateAgentSessionRequest = z.infer<typeof CreateAgentSessionRequestSchema>
+
+export type CreateAgentSessionResponse = {
+    type: 'success'
+    sessionId: string
+} | {
+    type: 'error'
+    error: string
+    code: string
+    sessionId?: string
+}
+
 export const MachineListDirectoryRequestSchema = z.object({
     path: z.string().min(1),
     includeHidden: z.boolean().optional()

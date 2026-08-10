@@ -516,6 +516,30 @@ export class SyncEngine {
             sessionId: payload.sid,
             reason: payload.reason
         })
+        const managerSessionId = before?.metadata?.managerSessionId
+        if (managerSessionId && managerSessionId !== payload.sid) {
+            const manager = this.getSessionByNamespace(managerSessionId, before.namespace)
+            if (manager) {
+                const childLabel = before.metadata?.name?.trim() || payload.sid
+                const outcome = payload.reason === 'completed' ? 'completed' : `ended (${payload.reason ?? 'unknown'})`
+                void (async () => {
+                    let targetSessionId = managerSessionId
+                    if (!manager.active) {
+                        const resumed = await this.resumeSession(managerSessionId, before.namespace)
+                        if (resumed.type !== 'success') return
+                        targetSessionId = resumed.sessionId
+                    }
+                    await this.sendMessage(targetSessionId, {
+                        text: `[HAPI agent notification] Child session "${childLabel}" (${payload.sid}) ${outcome}. Use inspect_peer for details if needed.`,
+                        localId: `manager-session-end:${payload.sid}`,
+                        sentFrom: 'webapp'
+                    })
+                })().catch(() => {
+                    // Best-effort fallback. The child is also instructed to report
+                    // checkpoints/final status directly through ping_peer.
+                })
+            }
+        }
         // Retry dedup now that this session is inactive — a prior dedup may have
         // skipped it because it was still active at the time. Cursor ACP rows that
         // never reached session-ready must not dedup-merge the original on failure.
@@ -1695,6 +1719,10 @@ async uploadScratchlistAttachment(
 
     async renameSession(sessionId: string, name: string): Promise<void> {
         await this.sessionCache.renameSession(sessionId, name)
+    }
+
+    setSessionManager(sessionId: string, managerSessionId: string, namespace: string): void {
+        this.sessionCache.setManagerSession(sessionId, managerSessionId, namespace)
     }
 
     async deleteSession(sessionId: string): Promise<void> {
