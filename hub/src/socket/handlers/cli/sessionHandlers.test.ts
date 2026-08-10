@@ -335,7 +335,7 @@ describe('cli session handlers', () => {
         expect(uuids).toEqual(['msg-1', 'msg-2'])
     })
 
-    it.each(['supersededBySessionId', 'opencodeClearOperation', 'managerSessionId'] as const)(
+    it.each(['supersededBySessionId', 'opencodeClearOperation', 'managerSessionId', 'managerNotificationState'] as const)(
         'ignores a forged hub-owned %s addition from CLI metadata',
         (field) => {
             const store = new Store(':memory:')
@@ -353,18 +353,23 @@ describe('cli session handlers', () => {
                     path: '/tmp/project',
                     [field]: field === 'supersededBySessionId' || field === 'managerSessionId'
                         ? 'foreign-session'
-                        : { replacementSessionId: 'foreign-session', state: 'reserved', updatedAt: Date.now() }
+                        : field === 'managerNotificationState'
+                            ? { terminal: { eventType: 'terminal', terminalState: 'completed', status: 'sent', updatedAt: Date.now() } }
+                            : { replacementSessionId: 'foreign-session', state: 'reserved', updatedAt: Date.now() }
                 }
             }, () => {})
             expect(store.sessions.getSessionByNamespace(session.id, 'default')?.metadata).not.toHaveProperty(field)
         }
     )
 
-    it('preserves existing hub-owned clear metadata across CLI metadata updates', () => {
+    it('preserves existing hub-owned notification metadata across CLI metadata updates', () => {
         const store = new Store(':memory:')
         const operation = { replacementSessionId: 'owned-target', state: 'completed', updatedAt: Date.now() }
+        const managerNotificationState = {
+            terminal: { eventType: 'terminal' as const, terminalState: 'completed' as const, status: 'sent' as const, updatedAt: Date.now() }
+        }
         const session = store.sessions.getOrCreateSession('preserve-clear-link', {
-            supersededBySessionId: 'owned-target', opencodeClearOperation: operation
+            supersededBySessionId: 'owned-target', opencodeClearOperation: operation, managerNotificationState
         }, null, 'default')
         const socket = new FakeSocket()
         registerSessionHandlers(socket as unknown as CliSocketWithData, {
@@ -378,11 +383,15 @@ describe('cli session handlers', () => {
             metadata: {
                 lifecycleState: 'archived',
                 supersededBySessionId: 'forged-target',
-                opencodeClearOperation: { replacementSessionId: 'forged-target', state: 'reserved', updatedAt: 0 }
+                opencodeClearOperation: { replacementSessionId: 'forged-target', state: 'reserved', updatedAt: 0 },
+                managerNotificationState: {}
             }
         }, () => {})
         expect(store.sessions.getSessionByNamespace(session.id, 'default')?.metadata).toMatchObject({
-            supersededBySessionId: 'owned-target', opencodeClearOperation: operation, lifecycleState: 'archived'
+            supersededBySessionId: 'owned-target',
+            opencodeClearOperation: operation,
+            managerNotificationState,
+            lifecycleState: 'archived'
         })
     })
 })

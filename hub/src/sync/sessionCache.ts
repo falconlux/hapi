@@ -13,6 +13,8 @@ const QUEUED_MESSAGE_THINKING_GRACE_MS = 15_000
 // HTTP caller as 409 instead of spinning forever.
 const METADATA_RETRY_ATTEMPTS = 5
 type RuntimeConfigKey = 'permissionMode' | 'model' | 'modelReasoningEffort' | 'effort' | 'serviceTier' | 'collaborationMode' | 'copilotAgentMode'
+type ManagerNotificationState = NonNullable<NonNullable<Session['metadata']>['managerNotificationState']>
+type ManagerNotificationDelivery = NonNullable<ManagerNotificationState['terminal']>
 
 export class SessionCache {
     private readonly sessions: Map<string, Session> = new Map()
@@ -846,6 +848,91 @@ export class SessionCache {
             if (result.result === 'success') return
         }
         throw new Error('Session was modified concurrently while linking its manager')
+    }
+
+    claimManagerTerminalNotification(
+        sessionId: string,
+        namespace: string,
+        terminalState: 'completed' | 'failed',
+        claimId: string,
+        now: number,
+        leaseMs: number
+    ): { result: 'claimed'; terminalState: 'completed' | 'failed' } | { result: 'duplicate' } {
+        for (let attempt = 0; attempt < METADATA_RETRY_ATTEMPTS; attempt += 1) {
+            const session = this.getSessionByNamespace(sessionId, namespace) ?? this.refreshSession(sessionId)
+            if (!session?.metadata || session.namespace !== namespace) return { result: 'duplicate' }
+
+            const notificationState = session.metadata.managerNotificationState ?? {}
+            const existing = notificationState.terminal
+            if (existing?.status === 'sent'
+                || (existing?.status === 'sending' && (existing.claimExpiresAt ?? 0) > now)) {
+                return { result: 'duplicate' }
+            }
+
+            // A completed/error race must not send two contradictory terminal messages.
+            const claimedTerminalState = existing?.terminalState ?? terminalState
+            const terminal: ManagerNotificationDelivery = {
+                eventType: 'terminal',
+                terminalState: claimedTerminalState,
+                status: 'sending',
+                claimId,
+                claimExpiresAt: now + leaseMs,
+                updatedAt: now
+            }
+            const result = this.store.sessions.updateSessionMetadata(
+                sessionId,
+                {
+                    ...session.metadata,
+                    managerNotificationState: { ...notificationState, terminal }
+                },
+                session.metadataVersion,
+                namespace,
+                { touchUpdatedAt: false }
+            )
+            if (result.result === 'error') throw new Error('Failed to claim manager terminal notification')
+            this.refreshSession(sessionId)
+            if (result.result === 'success') {
+                return { result: 'claimed', terminalState: claimedTerminalState }
+            }
+        }
+        return { result: 'duplicate' }
+    }
+
+    finishManagerTerminalNotification(
+        sessionId: string,
+        namespace: string,
+        claimId: string,
+        status: 'pending' | 'sent',
+        now: number
+    ): boolean {
+        for (let attempt = 0; attempt < METADATA_RETRY_ATTEMPTS; attempt += 1) {
+            const session = this.getSessionByNamespace(sessionId, namespace) ?? this.refreshSession(sessionId)
+            const notificationState = session?.metadata?.managerNotificationState
+            const existing = notificationState?.terminal
+            if (!session?.metadata || !existing || existing.status !== 'sending' || existing.claimId !== claimId) {
+                return false
+            }
+            const terminal: ManagerNotificationDelivery = {
+                eventType: 'terminal',
+                terminalState: existing.terminalState,
+                status,
+                updatedAt: now
+            }
+            const result = this.store.sessions.updateSessionMetadata(
+                sessionId,
+                {
+                    ...session.metadata,
+                    managerNotificationState: { ...notificationState, terminal }
+                },
+                session.metadataVersion,
+                namespace,
+                { touchUpdatedAt: false }
+            )
+            if (result.result === 'error') throw new Error('Failed to finish manager terminal notification')
+            this.refreshSession(sessionId)
+            if (result.result === 'success') return true
+        }
+        return false
     }
 
     async renameSession(sessionId: string, name: string): Promise<void> {
