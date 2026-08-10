@@ -38,6 +38,20 @@ const SessionCapabilitiesSchema = z.object({
     conversationHistory: ConversationHistoryCapabilitiesSchema.optional()
 })
 
+const ManagerNotificationDeliverySchema = z.object({
+    eventType: z.enum(['checkpoint', 'terminal']),
+    terminalState: z.enum(['completed', 'failed']).optional(),
+    status: z.enum(['pending', 'sending', 'sent']),
+    claimId: z.string().optional(),
+    claimExpiresAt: z.number().optional(),
+    updatedAt: z.number()
+})
+
+const ManagerNotificationStateSchema = z.object({
+    terminal: ManagerNotificationDeliverySchema.optional(),
+    checkpoints: z.record(z.string(), ManagerNotificationDeliverySchema).optional()
+})
+
 export type ConversationHistoryCapabilities = z.infer<typeof ConversationHistoryCapabilitiesSchema>
 
 export const WorktreeMetadataSchema = z.object({
@@ -61,6 +75,9 @@ export const MetadataSchema = z.object({
     // HAPI session that created/manages this agent session. Used for automatic
     // checkpoint/completion handoff without exposing hub credentials.
     managerSessionId: z.string().optional(),
+    // Hub-owned durable claims for manager notifications. Terminal and checkpoint
+    // namespaces are intentionally separate; the first terminal outcome wins.
+    managerNotificationState: ManagerNotificationStateSchema.optional(),
     claudeSessionId: z.string().optional(),
     // Parent HAPI session id when this session was created by message-level fork
     // (`claude --resume <id> --fork-session`). Lets the web list mark the new

@@ -54,6 +54,7 @@ import { SessionCache } from './sessionCache'
 
 type PiResumeAttempt = NonNullable<NonNullable<Session['metadata']>['piResumeAttempt']>
 type PtyResumeAttempt = NonNullable<NonNullable<Session['metadata']>['ptyResumeAttempt']>
+const MANAGER_NOTIFICATION_CLAIM_LEASE_MS = 60_000
 
 export type { Session, SyncEvent } from '@hapi/protocol/types'
 export type { Machine } from './machineCache'
@@ -516,30 +517,7 @@ export class SyncEngine {
             sessionId: payload.sid,
             reason: payload.reason
         })
-        const managerSessionId = before?.metadata?.managerSessionId
-        if (managerSessionId && managerSessionId !== payload.sid) {
-            const manager = this.getSessionByNamespace(managerSessionId, before.namespace)
-            if (manager) {
-                const childLabel = before.metadata?.name?.trim() || payload.sid
-                const outcome = payload.reason === 'completed' ? 'completed' : `ended (${payload.reason ?? 'unknown'})`
-                void (async () => {
-                    let targetSessionId = managerSessionId
-                    if (!manager.active) {
-                        const resumed = await this.resumeSession(managerSessionId, before.namespace)
-                        if (resumed.type !== 'success') return
-                        targetSessionId = resumed.sessionId
-                    }
-                    await this.sendMessage(targetSessionId, {
-                        text: `[HAPI agent notification] Child session "${childLabel}" (${payload.sid}) ${outcome}. Use inspect_peer for details if needed.`,
-                        localId: `manager-session-end:${payload.sid}`,
-                        sentFrom: 'webapp'
-                    })
-                })().catch(() => {
-                    // Best-effort fallback. The child is also instructed to report
-                    // checkpoints/final status directly through ping_peer.
-                })
-            }
-        }
+        if (before) void this.notifyManagerSessionEnd(before, payload.reason).catch(() => {})
         // Retry dedup now that this session is inactive — a prior dedup may have
         // skipped it because it was still active at the time. Cursor ACP rows that
         // never reached session-ready must not dedup-merge the original on failure.
@@ -945,6 +923,7 @@ async uploadScratchlistAttachment(
             sentFrom?: 'telegram-bot' | 'webapp'
             scheduledAt?: number | null
             deliveryMode?: MessageDeliveryMode
+            suppressDuplicateDelivery?: boolean
         }
     ): Promise<void> {
         if (this.historyActionsInFlight.has(sessionId)) {
@@ -953,6 +932,71 @@ async uploadScratchlistAttachment(
         const { actualSessionId, createdAt: activeTurnStartedAt } = await this.messageService.sendMessage(sessionId, payload)
         this.sessionCache.markMessageQueued(actualSessionId, Date.now(), activeTurnStartedAt)
         this.sessionCache.recordSessionActivity(actualSessionId, Date.now())
+    }
+
+    private async notifyManagerSessionEnd(child: Session, reason?: SessionEndReason): Promise<void> {
+        const managerSessionId = child.metadata?.managerSessionId
+        if (!managerSessionId || managerSessionId === child.id) return
+        const manager = this.getSessionByNamespace(managerSessionId, child.namespace)
+        if (!manager) return
+
+        const claimId = randomUUID()
+        const requestedState = reason === 'completed' ? 'completed' : 'failed'
+        const claim = this.sessionCache.claimManagerTerminalNotification(
+            child.id,
+            child.namespace,
+            requestedState,
+            claimId,
+            Date.now(),
+            MANAGER_NOTIFICATION_CLAIM_LEASE_MS
+        )
+        if (claim.result !== 'claimed') return
+
+        try {
+            let targetSessionId = managerSessionId
+            if (!manager.active) {
+                const resumed = await this.resumeSession(managerSessionId, child.namespace)
+                if (resumed.type !== 'success') throw new Error('Manager session resume failed')
+                targetSessionId = resumed.sessionId
+            }
+            const childLabel = child.metadata?.name?.trim() || child.id
+            const outcome = claim.terminalState === 'completed' ? 'completed' : 'failed'
+            await this.sendMessage(targetSessionId, {
+                text: `[HAPI agent notification] Child session "${childLabel}" (${child.id}) ${outcome}. Use inspect_peer for details if needed.`,
+                localId: `manager-notification:terminal:${managerSessionId}:${child.id}:${claim.terminalState}`,
+                sentFrom: 'webapp',
+                suppressDuplicateDelivery: true
+            })
+        } catch {
+            try {
+                this.sessionCache.finishManagerTerminalNotification(
+                    child.id,
+                    child.namespace,
+                    claimId,
+                    'pending',
+                    Date.now()
+                )
+            } catch {
+                // Keep the durable sending lease. A later retry is safe because
+                // the notification localId suppresses duplicate CLI/SSE emits.
+            }
+            return
+        }
+
+        // If this persistence step fails, keep the lease claimed. A later retry
+        // is safe because suppressDuplicateDelivery prevents re-emitting the
+        // durable localId row to CLI/SSE.
+        try {
+            this.sessionCache.finishManagerTerminalNotification(
+                child.id,
+                child.namespace,
+                claimId,
+                'sent',
+                Date.now()
+            )
+        } catch {
+            // Leave the lease claimed; duplicate delivery remains suppressed.
+        }
     }
 
     async cancelQueuedMessage(

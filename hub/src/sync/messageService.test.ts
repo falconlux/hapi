@@ -1218,6 +1218,31 @@ describe('MessageService.sendMessage deliveryMode', () => {
         })
     })
 
+    it('does not re-emit a duplicate notification localId to CLI or SSE', async () => {
+        const store = makeStore()
+        const session = store.sessions.getOrCreateSession(
+            'manager-notification-idempotency',
+            { path: '/tmp/manager-notification-idempotency', host: 'localhost', flavor: 'codex' },
+            null,
+            'default'
+        )
+        const { io, cliEmitted } = makeTrackingIo()
+        const publisher = makePublisher()
+        const service = new MessageService(store, io, publisher as any)
+        const payload = {
+            text: 'child completed',
+            localId: 'manager-notification:terminal:manager:child:completed',
+            suppressDuplicateDelivery: true
+        }
+
+        await service.sendMessage(session.id, payload)
+        await service.sendMessage(session.id, payload)
+
+        expect(cliEmitted).toHaveLength(1)
+        expect(publisher.events.filter((event) => event.type === 'message-received')).toHaveLength(1)
+        expect(store.messages.getUninvokedLocalMessages(session.id)).toHaveLength(1)
+    })
+
     it('downgrades a legacy persisted steer through the mature scheduled scan', () => {
         const store = makeStore()
         const session = store.sessions.getOrCreateSession(
