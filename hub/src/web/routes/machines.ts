@@ -173,7 +173,8 @@ export function createMachinesRoutes(getSyncEngine: () => SyncEngine | null): Ho
                 cwd,
                 'codex',
                 parsed.data.model,
-                parsed.data.reasoningEffort
+                parsed.data.reasoningEffort,
+                true
             )
             if (spawned.type !== 'success') {
                 return c.json({ type: 'error', error: spawned.message, code: 'spawn_failed' }, 502)
