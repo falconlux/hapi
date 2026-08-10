@@ -1,4 +1,5 @@
 import {
+    CreateAgentSessionRequestSchema,
     MACHINE_DISPLAY_NAME_MAX_LENGTH,
     MachineListDirectoryRequestSchema,
     MachinePathsExistsRequestSchema,
@@ -12,6 +13,7 @@ import { requireMachine } from './guards'
 
 export function createMachinesRoutes(getSyncEngine: () => SyncEngine | null): Hono<WebAppEnv> {
     const app = new Hono<WebAppEnv>()
+    const agentSessionCreatesInFlight = new Set<string>()
 
     app.get('/machines', (c) => {
         const engine = getSyncEngine()
@@ -105,6 +107,112 @@ export function createMachinesRoutes(getSyncEngine: () => SyncEngine | null): Ho
             startingMode
         )
         return c.json(result)
+    })
+
+    app.post('/machines/:id/agent-sessions', async (c) => {
+        const engine = getSyncEngine()
+        if (!engine) return c.json({ type: 'error', error: 'Not connected', code: 'not_connected' }, 503)
+
+        const machineId = c.req.param('id')
+        const machine = requireMachine(c, engine, machineId)
+        if (machine instanceof Response) return machine
+
+        const body = await c.req.json().catch(() => null)
+        const parsed = CreateAgentSessionRequestSchema.safeParse(body)
+        if (!parsed.success) {
+            return c.json({
+                type: 'error',
+                error: 'Invalid body: title, cwd, and initialMessage/objective are required',
+                code: 'invalid_request'
+            }, 400)
+        }
+
+        const namespace = c.get('namespace')
+        const title = parsed.data.title.trim()
+        const cwd = parsed.data.cwd.trim().replace(/[\\/]+$/, '') || parsed.data.cwd.trim()
+        const managerSessionId = parsed.data.managerSessionId
+        if (managerSessionId && !engine.getSessionByNamespace(managerSessionId, namespace)) {
+            return c.json({
+                type: 'error',
+                error: 'managerSessionId is not available in this namespace',
+                code: 'invalid_manager_session'
+            }, 400)
+        }
+
+        const normalizedTitle = title.replace(/\s+/g, ' ').toLowerCase()
+        const normalizedCwd = cwd.replace(/[\\/]+$/, '')
+        const duplicate = engine.getSessionsByNamespace(namespace).find((session) => {
+            const sessionTitle = session.metadata?.name?.trim().replace(/\s+/g, ' ').toLowerCase()
+            const sessionCwd = session.metadata?.path?.trim().replace(/[\\/]+$/, '')
+            const recent = Date.now() - session.createdAt < 5 * 60_000
+            return sessionTitle === normalizedTitle && sessionCwd === normalizedCwd && (session.active || recent)
+        })
+        if (duplicate) {
+            return c.json({
+                type: 'error',
+                error: `A matching agent session already exists: ${duplicate.id}`,
+                code: 'duplicate_agent_session',
+                sessionId: duplicate.id
+            }, 409)
+        }
+
+        const createKey = `${namespace}\u0000${machineId}\u0000${normalizedCwd}\u0000${normalizedTitle}`
+        if (agentSessionCreatesInFlight.has(createKey)) {
+            return c.json({
+                type: 'error',
+                error: 'An identical agent session creation is already in progress',
+                code: 'duplicate_agent_session'
+            }, 409)
+        }
+
+        agentSessionCreatesInFlight.add(createKey)
+        let sessionId: string | undefined
+        try {
+            const spawned = await engine.spawnSession(
+                machineId,
+                cwd,
+                'codex',
+                parsed.data.model,
+                parsed.data.reasoningEffort
+            )
+            if (spawned.type !== 'success') {
+                return c.json({ type: 'error', error: spawned.message, code: 'spawn_failed' }, 502)
+            }
+            sessionId = spawned.sessionId
+
+            if (!await engine.waitForSessionActive(sessionId)) {
+                return c.json({
+                    type: 'error',
+                    error: 'Created session did not become active before timeout',
+                    code: 'session_start_timeout',
+                    sessionId
+                }, 504)
+            }
+
+            if (managerSessionId) engine.setSessionManager(sessionId, managerSessionId, namespace)
+            await engine.renameSession(sessionId, title)
+
+            const objective = parsed.data.initialMessage ?? parsed.data.objective ?? ''
+            const managerContract = managerSessionId
+                ? `\n\n[HAPI manager notification contract]\nManager session: ${managerSessionId}\nAt every material checkpoint and on completion or failure, call ping_peer for this manager session. Use: 产出/SHA/测试/卡点/下一步. Do not wait for the manager to inspect you. The Hub will also send a fallback notification when this child session ends.`
+                : ''
+            await engine.sendMessage(sessionId, {
+                text: `${objective}${managerContract}`,
+                localId: `create-agent-session:${sessionId}`,
+                sentFrom: 'webapp'
+            })
+
+            return c.json({ type: 'success' as const, sessionId })
+        } catch (error) {
+            return c.json({
+                type: 'error',
+                error: error instanceof Error ? error.message : String(error),
+                code: 'initialization_failed',
+                ...(sessionId ? { sessionId } : {})
+            }, 500)
+        } finally {
+            agentSessionCreatesInFlight.delete(createKey)
+        }
     })
 
     app.post('/machines/:id/list-directory', async (c) => {

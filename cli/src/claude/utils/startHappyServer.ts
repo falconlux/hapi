@@ -26,7 +26,7 @@ import {
     PING_PEER_TOOL_DESCRIPTION,
     SESSION_ID_PREFIX_PARAM_DESCRIPTION,
 } from '@hapi/protocol/sessionCitation'
-import { PingPeerError, formatInspectPeerReport, formatPeerSessionsList, inspectPeer, listPeerSessions, peerListFetchLimit, pingPeer } from "@/modules/pingPeer/pingPeer";
+import { PingPeerError, createPeerAgentSession, formatInspectPeerReport, formatPeerSessionsList, inspectPeer, listPeerSessions, peerListFetchLimit, pingPeer } from "@/modules/pingPeer/pingPeer";
 
 type StartHappyServerOptions = {
     emitTitleSummary?: boolean;
@@ -41,6 +41,7 @@ type StartHappyServerOptions = {
 const CLAUDE_MANUAL_APPROVAL_HAPI_TOOLS = new Set([
     'display_media',
     'display_video',
+    'create_peer',
     'ping_peer',
     'inspect_peer'
 ]);
@@ -126,6 +127,19 @@ function createHapiMcpServer(
         limit: z.number().int().min(1).max(100).optional().describe(
             'Max sessions to return (default 30, max 100). Newest updatedAt first.'
         ),
+    });
+
+    const createPeerInputSchema: z.ZodTypeAny = z.object({
+        title: z.string().trim().min(1).max(255).describe('Visible title for the new HAPI agent session'),
+        cwd: z.string().trim().min(1).describe('Working directory on the current HAPI runner machine'),
+        initialMessage: z.string().trim().min(1).optional().describe('Initial task message for the new agent'),
+        objective: z.string().trim().min(1).optional().describe('Alias for initialMessage'),
+        model: z.string().trim().min(1).optional().describe('Optional Codex model override'),
+        reasoningEffort: z.string().trim().min(1).optional().describe('Optional Codex reasoning effort override'),
+    }).superRefine((value, context) => {
+        if (!value.initialMessage && !value.objective) {
+            context.addIssue({ code: z.ZodIssueCode.custom, message: 'initialMessage or objective is required' });
+        }
     });
 
     async function displayInlineMedia(
@@ -413,6 +427,49 @@ function createHapiMcpServer(
         }
     });
 
+    mcp.registerTool<any, any>('create_peer', {
+        description: 'Create a separate visible Codex HAPI agent session on the current runner and namespace. Returns a stable sessionId that can immediately be used with inspect_peer and ping_peer. The child is linked back to this manager session for checkpoint/completion notifications.',
+        title: 'Create Peer Agent Session',
+        inputSchema: createPeerInputSchema,
+    }, async (args: {
+        title: string;
+        cwd: string;
+        initialMessage?: string;
+        objective?: string;
+        model?: string;
+        reasoningEffort?: string;
+    }) => {
+        const machineId = client.getMetadata()?.machineId?.trim();
+        if (!machineId) {
+            return {
+                content: [{ type: 'text' as const, text: 'Failed to create peer: current session has no runner machineId' }],
+                isError: true,
+            };
+        }
+        try {
+            const result = await createPeerAgentSession({
+                machineId,
+                title: args.title,
+                cwd: args.cwd,
+                initialMessage: args.initialMessage,
+                objective: args.objective,
+                model: args.model,
+                reasoningEffort: args.reasoningEffort,
+                managerSessionId: client.sessionId,
+            });
+            return {
+                content: [{ type: 'text' as const, text: `Created peer session ${result.sessionId}` }],
+                isError: false,
+            };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return {
+                content: [{ type: 'text' as const, text: `Failed to create peer: ${message}` }],
+                isError: true,
+            };
+        }
+    });
+
 
     if (skillLookup) {
         mcp.registerTool<any, any>('skill_lookup', {
@@ -534,8 +591,8 @@ export async function startHappyServer(client: ApiSessionClient, options: StartH
     }));
 
     const toolNames = enableChangeTitle
-        ? ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'ping_peer', 'inspect_peer']
-        : ['display_image', 'display_video', 'display_media', 'list_peers', 'ping_peer', 'inspect_peer'];
+        ? ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer']
+        : ['display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer'];
     if (options.skillLookup) {
         toolNames.push('skill_lookup');
     }

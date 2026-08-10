@@ -26,6 +26,118 @@ function createMachine(overrides?: Partial<Machine>): Machine {
 }
 
 describe('machines routes', () => {
+    it('creates a visible Codex agent session and delivers its manager contract', async () => {
+        const machine = createMachine()
+        const calls: Array<{ name: string; args: unknown[] }> = []
+        const manager = {
+            id: 'manager-1',
+            namespace: 'default',
+            active: true,
+            createdAt: 1,
+            updatedAt: 1,
+            metadata: { path: '/tmp/manager', host: 'localhost', name: 'Manager' }
+        }
+        const engine = {
+            getMachine: () => machine,
+            getMachineByNamespace: () => machine,
+            getSessionByNamespace: (id: string) => id === manager.id ? manager : undefined,
+            getSessionsByNamespace: () => [manager],
+            spawnSession: async (...args: unknown[]) => {
+                calls.push({ name: 'spawn', args })
+                return { type: 'success' as const, sessionId: 'child-1' }
+            },
+            waitForSessionActive: async (...args: unknown[]) => {
+                calls.push({ name: 'wait', args })
+                return true
+            },
+            setSessionManager: (...args: unknown[]) => calls.push({ name: 'manager', args }),
+            renameSession: async (...args: unknown[]) => { calls.push({ name: 'rename', args }) },
+            sendMessage: async (...args: unknown[]) => { calls.push({ name: 'message', args }) }
+        } as unknown as Partial<SyncEngine>
+        const app = new Hono<WebAppEnv>()
+        app.use('*', async (c, next) => { c.set('namespace', 'default'); await next() })
+        app.route('/api', createMachinesRoutes(() => engine as SyncEngine))
+
+        const response = await app.request('/api/machines/machine-1/agent-sessions', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                title: 'Review worker',
+                cwd: '/tmp/project/',
+                objective: 'Review the change',
+                model: 'gpt-5.6-sol',
+                reasoningEffort: 'medium',
+                managerSessionId: manager.id
+            })
+        })
+
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({ type: 'success', sessionId: 'child-1' })
+        expect(calls[0]).toEqual({
+            name: 'spawn',
+            args: ['machine-1', '/tmp/project', 'codex', 'gpt-5.6-sol', 'medium']
+        })
+        expect(calls.find((call) => call.name === 'manager')?.args).toEqual(['child-1', 'manager-1', 'default'])
+        expect(calls.find((call) => call.name === 'rename')?.args).toEqual(['child-1', 'Review worker'])
+        const message = calls.find((call) => call.name === 'message')?.args[1] as { text: string }
+        expect(message.text).toContain('Review the change')
+        expect(message.text).toContain('Manager session: manager-1')
+        expect(message.text).toContain('ping_peer')
+    })
+
+    it('rejects an empty agent-session title before spawning', async () => {
+        const machine = createMachine()
+        let spawned = false
+        const engine = {
+            getMachine: () => machine,
+            getMachineByNamespace: () => machine,
+            spawnSession: async () => { spawned = true; return { type: 'success', sessionId: 'unexpected' } }
+        } as unknown as Partial<SyncEngine>
+        const app = new Hono<WebAppEnv>()
+        app.use('*', async (c, next) => { c.set('namespace', 'default'); await next() })
+        app.route('/api', createMachinesRoutes(() => engine as SyncEngine))
+
+        const response = await app.request('/api/machines/machine-1/agent-sessions', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ title: '   ', cwd: '/tmp/project', objective: 'work' })
+        })
+
+        expect(response.status).toBe(400)
+        expect(spawned).toBe(false)
+    })
+
+    it('rejects a recent matching title and cwd with the existing session id', async () => {
+        const machine = createMachine()
+        const engine = {
+            getMachine: () => machine,
+            getMachineByNamespace: () => machine,
+            getSessionsByNamespace: () => [{
+                id: 'existing-child',
+                namespace: 'default',
+                active: false,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                metadata: { path: '/tmp/project', host: 'localhost', name: 'Review Worker' }
+            }]
+        } as unknown as Partial<SyncEngine>
+        const app = new Hono<WebAppEnv>()
+        app.use('*', async (c, next) => { c.set('namespace', 'default'); await next() })
+        app.route('/api', createMachinesRoutes(() => engine as SyncEngine))
+
+        const response = await app.request('/api/machines/machine-1/agent-sessions', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ title: ' review   worker ', cwd: '/tmp/project/', initialMessage: 'work' })
+        })
+
+        expect(response.status).toBe(409)
+        expect(await response.json()).toMatchObject({
+            code: 'duplicate_agent_session',
+            sessionId: 'existing-child'
+        })
+    })
+
     it('forwards Grok Auto permission mode when spawning', async () => {
         const machine = createMachine()
         let capturedPermissionMode: string | undefined

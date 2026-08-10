@@ -54,6 +54,7 @@ import { SessionCache } from './sessionCache'
 
 type PiResumeAttempt = NonNullable<NonNullable<Session['metadata']>['piResumeAttempt']>
 type PtyResumeAttempt = NonNullable<NonNullable<Session['metadata']>['ptyResumeAttempt']>
+const MANAGER_NOTIFICATION_CLAIM_LEASE_MS = 60_000
 
 export type { Session, SyncEvent } from '@hapi/protocol/types'
 export type { Machine } from './machineCache'
@@ -516,6 +517,7 @@ export class SyncEngine {
             sessionId: payload.sid,
             reason: payload.reason
         })
+        if (before) void this.notifyManagerSessionEnd(before, payload.reason).catch(() => {})
         // Retry dedup now that this session is inactive — a prior dedup may have
         // skipped it because it was still active at the time. Cursor ACP rows that
         // never reached session-ready must not dedup-merge the original on failure.
@@ -921,6 +923,7 @@ async uploadScratchlistAttachment(
             sentFrom?: 'telegram-bot' | 'webapp'
             scheduledAt?: number | null
             deliveryMode?: MessageDeliveryMode
+            suppressDuplicateDelivery?: boolean
         }
     ): Promise<void> {
         if (this.historyActionsInFlight.has(sessionId)) {
@@ -929,6 +932,72 @@ async uploadScratchlistAttachment(
         const { actualSessionId, createdAt: activeTurnStartedAt } = await this.messageService.sendMessage(sessionId, payload)
         this.sessionCache.markMessageQueued(actualSessionId, Date.now(), activeTurnStartedAt)
         this.sessionCache.recordSessionActivity(actualSessionId, Date.now())
+    }
+
+    private async notifyManagerSessionEnd(child: Session, reason?: SessionEndReason): Promise<void> {
+        const linkedManagerSessionId = child.metadata?.managerSessionId
+        if (!linkedManagerSessionId || linkedManagerSessionId === child.id) return
+
+        const claimId = randomUUID()
+        const requestedState = reason === 'completed' ? 'completed' : 'failed'
+        const claim = this.sessionCache.claimManagerTerminalNotification(
+            child.id,
+            child.namespace,
+            linkedManagerSessionId,
+            requestedState,
+            claimId,
+            Date.now(),
+            MANAGER_NOTIFICATION_CLAIM_LEASE_MS
+        )
+        if (claim.result !== 'claimed') return
+
+        try {
+            const manager = this.getSessionByNamespace(claim.managerSessionId, child.namespace)
+            if (!manager) throw new Error('Manager session is unavailable')
+            let targetSessionId = claim.managerSessionId
+            if (!manager.active) {
+                const resumed = await this.resumeSession(claim.managerSessionId, child.namespace)
+                if (resumed.type !== 'success') throw new Error('Manager session resume failed')
+                targetSessionId = resumed.sessionId
+            }
+            const childLabel = child.metadata?.name?.trim() || child.id
+            const outcome = claim.terminalState === 'completed' ? 'completed' : 'failed'
+            await this.sendMessage(targetSessionId, {
+                text: `[HAPI agent notification] Child session "${childLabel}" (${child.id}) ${outcome}. Use inspect_peer for details if needed.`,
+                localId: `manager-notification:terminal:${claim.managerSessionId}:${child.id}:${claim.terminalState}`,
+                sentFrom: 'webapp',
+                suppressDuplicateDelivery: true
+            })
+        } catch {
+            try {
+                this.sessionCache.finishManagerTerminalNotification(
+                    child.id,
+                    child.namespace,
+                    claimId,
+                    'pending',
+                    Date.now()
+                )
+            } catch {
+                // Keep the durable sending lease. A later retry is safe because
+                // the notification localId suppresses duplicate CLI/SSE emits.
+            }
+            return
+        }
+
+        // If this persistence step fails, keep the lease claimed. A later retry
+        // is safe because suppressDuplicateDelivery prevents re-emitting the
+        // durable localId row to CLI/SSE.
+        try {
+            this.sessionCache.finishManagerTerminalNotification(
+                child.id,
+                child.namespace,
+                claimId,
+                'sent',
+                Date.now()
+            )
+        } catch {
+            // Leave the lease claimed; duplicate delivery remains suppressed.
+        }
     }
 
     async cancelQueuedMessage(
@@ -1695,6 +1764,10 @@ async uploadScratchlistAttachment(
 
     async renameSession(sessionId: string, name: string): Promise<void> {
         await this.sessionCache.renameSession(sessionId, name)
+    }
+
+    setSessionManager(sessionId: string, managerSessionId: string, namespace: string): void {
+        this.sessionCache.setManagerSession(sessionId, managerSessionId, namespace)
     }
 
     async deleteSession(sessionId: string): Promise<void> {

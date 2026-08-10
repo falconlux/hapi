@@ -13,6 +13,8 @@ const QUEUED_MESSAGE_THINKING_GRACE_MS = 15_000
 // HTTP caller as 409 instead of spinning forever.
 const METADATA_RETRY_ATTEMPTS = 5
 type RuntimeConfigKey = 'permissionMode' | 'model' | 'modelReasoningEffort' | 'effort' | 'serviceTier' | 'collaborationMode' | 'copilotAgentMode'
+type ManagerNotificationState = NonNullable<NonNullable<Session['metadata']>['managerNotificationState']>
+type ManagerNotificationDelivery = NonNullable<ManagerNotificationState['terminal']>
 
 export class SessionCache {
     private readonly sessions: Map<string, Session> = new Map()
@@ -811,6 +813,134 @@ export class SessionCache {
         throw new Error('Session was modified concurrently while archiving from hub')
     }
 
+    setManagerSession(sessionId: string, managerSessionId: string, namespace: string): void {
+        for (let attempt = 0; attempt < METADATA_RETRY_ATTEMPTS; attempt += 1) {
+            const session = this.getSessionByNamespace(sessionId, namespace) ?? this.refreshSession(sessionId)
+            if (!session || session.namespace !== namespace || !session.metadata) {
+                throw new Error('Created session is not available in this namespace')
+            }
+            if (session.metadata.managerSessionId === managerSessionId) return
+
+            const result = this.store.sessions.updateSessionMetadata(
+                sessionId,
+                { ...session.metadata, managerSessionId },
+                session.metadataVersion,
+                namespace,
+                { touchUpdatedAt: false }
+            )
+            if (result.result === 'error') {
+                throw new Error('Failed to persist manager session link')
+            }
+            this.refreshSession(sessionId)
+            if (result.result === 'success') return
+        }
+        throw new Error('Session was modified concurrently while linking its manager')
+    }
+
+    claimManagerTerminalNotification(
+        sessionId: string,
+        namespace: string,
+        managerSessionId: string,
+        terminalState: 'completed' | 'failed',
+        claimId: string,
+        now: number,
+        leaseMs: number
+    ): {
+        result: 'claimed'
+        managerSessionId: string
+        terminalState: 'completed' | 'failed'
+    } | { result: 'duplicate' } {
+        for (let attempt = 0; attempt < METADATA_RETRY_ATTEMPTS; attempt += 1) {
+            const session = this.getSessionByNamespace(sessionId, namespace) ?? this.refreshSession(sessionId)
+            if (!session?.metadata || session.namespace !== namespace) return { result: 'duplicate' }
+
+            const notificationState = session.metadata.managerNotificationState ?? {}
+            const existing = notificationState.terminal
+            if (existing && (existing.eventType !== 'terminal' || existing.childSessionId !== sessionId)) {
+                throw new Error('Invalid persisted manager terminal notification identity')
+            }
+            if (existing?.status === 'sent'
+                || (existing?.status === 'sending' && (existing.claimExpiresAt ?? 0) > now)) {
+                return { result: 'duplicate' }
+            }
+
+            // A completed/error race must not send two contradictory terminal messages.
+            // The first claim also freezes the manager identity so a retry cannot
+            // drift to a different parent if the child metadata changes later.
+            const claimedManagerSessionId = existing?.managerSessionId ?? managerSessionId
+            const claimedTerminalState = existing?.terminalState ?? terminalState
+            const terminal: ManagerNotificationDelivery = {
+                eventType: 'terminal',
+                managerSessionId: claimedManagerSessionId,
+                childSessionId: sessionId,
+                terminalState: claimedTerminalState,
+                status: 'sending',
+                claimId,
+                claimExpiresAt: now + leaseMs,
+                updatedAt: now
+            }
+            const result = this.store.sessions.updateSessionMetadata(
+                sessionId,
+                {
+                    ...session.metadata,
+                    managerNotificationState: { ...notificationState, terminal }
+                },
+                session.metadataVersion,
+                namespace,
+                { touchUpdatedAt: false }
+            )
+            if (result.result === 'error') throw new Error('Failed to claim manager terminal notification')
+            this.refreshSession(sessionId)
+            if (result.result === 'success') {
+                return {
+                    result: 'claimed',
+                    managerSessionId: claimedManagerSessionId,
+                    terminalState: claimedTerminalState
+                }
+            }
+        }
+        return { result: 'duplicate' }
+    }
+
+    finishManagerTerminalNotification(
+        sessionId: string,
+        namespace: string,
+        claimId: string,
+        status: 'pending' | 'sent',
+        now: number
+    ): boolean {
+        for (let attempt = 0; attempt < METADATA_RETRY_ATTEMPTS; attempt += 1) {
+            const session = this.getSessionByNamespace(sessionId, namespace) ?? this.refreshSession(sessionId)
+            const notificationState = session?.metadata?.managerNotificationState
+            const existing = notificationState?.terminal
+            if (!session?.metadata || !existing || existing.status !== 'sending' || existing.claimId !== claimId) {
+                return false
+            }
+            const terminal: ManagerNotificationDelivery = {
+                eventType: 'terminal',
+                managerSessionId: existing.managerSessionId,
+                childSessionId: existing.childSessionId,
+                terminalState: existing.terminalState,
+                status,
+                updatedAt: now
+            }
+            const result = this.store.sessions.updateSessionMetadata(
+                sessionId,
+                {
+                    ...session.metadata,
+                    managerNotificationState: { ...notificationState, terminal }
+                },
+                session.metadataVersion,
+                namespace,
+                { touchUpdatedAt: false }
+            )
+            if (result.result === 'error') throw new Error('Failed to finish manager terminal notification')
+            this.refreshSession(sessionId)
+            if (result.result === 'success') return true
+        }
+        return false
+    }
+
     async renameSession(sessionId: string, name: string): Promise<void> {
         // tiann/hapi#919: retry-with-refresh on version-mismatch instead of
         // throwing on the first contention. Mirrors the good pattern in
@@ -1278,6 +1408,10 @@ export class SessionCache {
         }
         if (typeof oldObj.host === 'string' && typeof newObj.host !== 'string') {
             merged.host = oldObj.host
+            changed = true
+        }
+        if (typeof oldObj.managerSessionId === 'string' && typeof newObj.managerSessionId !== 'string') {
+            merged.managerSessionId = oldObj.managerSessionId
             changed = true
         }
         if (typeof oldObj.preferredPermissionMode === 'string' && typeof newObj.preferredPermissionMode !== 'string') {
