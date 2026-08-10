@@ -75,7 +75,7 @@ describe('machines routes', () => {
         expect(await response.json()).toEqual({ type: 'success', sessionId: 'child-1' })
         expect(calls[0]).toEqual({
             name: 'spawn',
-            args: ['machine-1', '/tmp/project', 'codex', 'gpt-5.6-sol', 'medium']
+            args: ['machine-1', '/tmp/project', 'codex', 'gpt-5.6-sol', 'medium', true]
         })
         expect(calls.find((call) => call.name === 'manager')?.args).toEqual(['child-1', 'manager-1', 'default'])
         expect(calls.find((call) => call.name === 'rename')?.args).toEqual(['child-1', 'Review worker'])
