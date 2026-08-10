@@ -354,7 +354,16 @@ describe('cli session handlers', () => {
                     [field]: field === 'supersededBySessionId' || field === 'managerSessionId'
                         ? 'foreign-session'
                         : field === 'managerNotificationState'
-                            ? { terminal: { eventType: 'terminal', terminalState: 'completed', status: 'sent', updatedAt: Date.now() } }
+                            ? {
+                                terminal: {
+                                    eventType: 'terminal',
+                                    managerSessionId: 'manager-session',
+                                    childSessionId: session.id,
+                                    terminalState: 'completed',
+                                    status: 'sent',
+                                    updatedAt: Date.now()
+                                }
+                            }
                             : { replacementSessionId: 'foreign-session', state: 'reserved', updatedAt: Date.now() }
                 }
             }, () => {})
@@ -366,7 +375,14 @@ describe('cli session handlers', () => {
         const store = new Store(':memory:')
         const operation = { replacementSessionId: 'owned-target', state: 'completed', updatedAt: Date.now() }
         const managerNotificationState = {
-            terminal: { eventType: 'terminal' as const, terminalState: 'completed' as const, status: 'sent' as const, updatedAt: Date.now() }
+            terminal: {
+                eventType: 'terminal' as const,
+                managerSessionId: 'owned-target',
+                childSessionId: 'preserve-clear-link',
+                terminalState: 'completed' as const,
+                status: 'sent' as const,
+                updatedAt: Date.now()
+            }
         }
         const session = store.sessions.getOrCreateSession('preserve-clear-link', {
             supersededBySessionId: 'owned-target', opencodeClearOperation: operation, managerNotificationState

@@ -11,14 +11,34 @@ async function waitFor(predicate: () => boolean, timeoutMs: number = 1_000): Pro
     }
 }
 
+function createEngine(store: Store) {
+    const cliEmitted: unknown[][] = []
+    const sseEvents: Array<{ type: string; sessionId?: string }> = []
+    const io = {
+        of() {
+            return {
+                to() {
+                    return {
+                        emit(...args: unknown[]) {
+                            cliEmitted.push(args)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    const sseManager = {
+        broadcast(event: { type: string; sessionId?: string }) {
+            sseEvents.push(event)
+        }
+    }
+    const engine = new SyncEngine(store, io as never, new RpcRegistry(), sseManager as never)
+    return { engine, cliEmitted, sseEvents }
+}
+
 function createHarness(childCount: number = 1) {
     const store = new Store(':memory:')
-    const engine = new SyncEngine(
-        store,
-        {} as never,
-        new RpcRegistry(),
-        { broadcast() {} } as never
-    )
+    const { engine, cliEmitted, sseEvents } = createEngine(store)
     const manager = engine.getOrCreateSession(
         'manager-tag',
         { path: '/tmp/manager', host: 'localhost', name: 'Manager', flavor: 'codex' },
@@ -36,7 +56,7 @@ function createHarness(childCount: number = 1) {
         engine.setSessionManager(child.id, manager.id, 'default')
         return child
     })
-    return { store, engine, manager, children }
+    return { store, engine, manager, children, cliEmitted, sseEvents }
 }
 
 describe('manager-linked agent sessions', () => {
@@ -59,11 +79,17 @@ describe('manager-linked agent sessions', () => {
             localId: `manager-notification:terminal:${manager.id}:${child!.id}:completed`
         }])
         expect(engine.getSession(child!.id)?.metadata?.managerNotificationState?.terminal?.status).toBe('sent')
+        expect(engine.getSession(child!.id)?.metadata?.managerNotificationState?.terminal).toMatchObject({
+            managerSessionId: manager.id,
+            childSessionId: child!.id,
+            terminalState: 'completed'
+        })
         engine.stop()
     })
 
-    it('claims concurrent duplicate end events before either can deliver', async () => {
-        const { engine, children: [child] } = createHarness()
+    it('claims concurrent conflicting end events across independent caches before either can deliver', async () => {
+        const { store, engine, children: [child] } = createHarness()
+        const { engine: rival } = createEngine(store)
         let releaseSend!: () => void
         const blocked = new Promise<void>((resolve) => { releaseSend = resolve })
         let sends = 0
@@ -71,31 +97,90 @@ describe('manager-linked agent sessions', () => {
             sends += 1
             await blocked
         }
+        rival.sendMessage = async () => {
+            sends += 1
+            await blocked
+        }
 
         engine.handleSessionEnd({ sid: child!.id, time: Date.now(), reason: 'completed' })
-        engine.handleSessionEnd({ sid: child!.id, time: Date.now(), reason: 'completed' })
+        rival.handleSessionEnd({ sid: child!.id, time: Date.now(), reason: 'error' })
         await waitFor(() => sends === 1)
         expect(sends).toBe(1)
         releaseSend()
         await waitFor(() => engine.getSession(child!.id)?.metadata?.managerNotificationState?.terminal?.status === 'sent')
         expect(sends).toBe(1)
+        expect(engine.getSession(child!.id)?.metadata?.managerNotificationState?.terminal?.terminalState).toBe('completed')
         engine.stop()
+        rival.stop()
     })
 
-    it('releases a failed claim so a repeated end event retries once', async () => {
-        const { engine, children: [child] } = createHarness()
+    it('retries after a post-persistence send failure without duplicate CLI or SSE delivery', async () => {
+        const { store, engine, manager, children: [child], cliEmitted, sseEvents } = createHarness()
+        const sendMessage = engine.sendMessage.bind(engine)
         let attempts = 0
-        engine.sendMessage = async () => {
+        engine.sendMessage = async (sessionId, payload) => {
             attempts += 1
-            if (attempts === 1) throw new Error('simulated send failure')
+            await sendMessage(sessionId, payload)
+            if (attempts === 1) throw new Error('simulated post-persistence send failure')
         }
 
         engine.handleSessionEnd({ sid: child!.id, time: Date.now(), reason: 'error' })
         await waitFor(() => engine.getSession(child!.id)?.metadata?.managerNotificationState?.terminal?.status === 'pending')
-        engine.handleSessionEnd({ sid: child!.id, time: Date.now(), reason: 'error' })
+        const replacementManager = engine.getOrCreateSession(
+            'replacement-manager',
+            { path: '/tmp/replacement-manager', host: 'localhost', name: 'Replacement Manager', flavor: 'codex' },
+            null,
+            'default'
+        )
+        engine.handleSessionAlive({ sid: replacementManager.id, time: Date.now() })
+        engine.setSessionManager(child!.id, replacementManager.id, 'default')
+        engine.handleSessionEnd({ sid: child!.id, time: Date.now(), reason: 'completed' })
         await waitFor(() => engine.getSession(child!.id)?.metadata?.managerNotificationState?.terminal?.status === 'sent')
 
         expect(attempts).toBe(2)
+        expect(engine.getSession(child!.id)?.metadata?.managerNotificationState?.terminal).toMatchObject({
+            managerSessionId: manager.id,
+            childSessionId: child!.id,
+            terminalState: 'failed'
+        })
+        expect(cliEmitted.filter(([event]) => event === 'update')).toHaveLength(1)
+        expect(sseEvents.filter((event) => event.type === 'message-received' && event.sessionId === manager.id)).toHaveLength(1)
+        expect(store.messages.getUninvokedLocalMessages(manager.id).map((message) => message.localId)).toEqual([
+            `manager-notification:terminal:${manager.id}:${child!.id}:failed`
+        ])
+        expect(store.messages.getUninvokedLocalMessages(replacementManager.id)).toHaveLength(0)
+        engine.stop()
+    })
+
+    it('keeps checkpoint claims separate from the terminal claim', async () => {
+        const { store, engine, manager, children: [child] } = createHarness()
+        const stored = store.sessions.getSessionByNamespace(child!.id, 'default')!
+        const checkpoint = {
+            eventType: 'checkpoint' as const,
+            managerSessionId: manager.id,
+            childSessionId: child!.id,
+            status: 'sent' as const,
+            updatedAt: Date.now()
+        }
+        const seeded = store.sessions.updateSessionMetadata(
+            child!.id,
+            {
+                ...stored.metadata as Record<string, unknown>,
+                managerNotificationState: { checkpoints: { 'checkpoint-1': checkpoint } }
+            },
+            stored.metadataVersion,
+            'default',
+            { touchUpdatedAt: false }
+        )
+        expect(seeded.result).toBe('success')
+        engine.sendMessage = async () => {}
+
+        engine.handleSessionEnd({ sid: child!.id, time: Date.now(), reason: 'completed' })
+        await waitFor(() => engine.getSession(child!.id)?.metadata?.managerNotificationState?.terminal?.status === 'sent')
+
+        expect(engine.getSession(child!.id)?.metadata?.managerNotificationState?.checkpoints).toEqual({
+            'checkpoint-1': checkpoint
+        })
         engine.stop()
     })
 
