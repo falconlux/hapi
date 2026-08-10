@@ -853,26 +853,39 @@ export class SessionCache {
     claimManagerTerminalNotification(
         sessionId: string,
         namespace: string,
+        managerSessionId: string,
         terminalState: 'completed' | 'failed',
         claimId: string,
         now: number,
         leaseMs: number
-    ): { result: 'claimed'; terminalState: 'completed' | 'failed' } | { result: 'duplicate' } {
+    ): {
+        result: 'claimed'
+        managerSessionId: string
+        terminalState: 'completed' | 'failed'
+    } | { result: 'duplicate' } {
         for (let attempt = 0; attempt < METADATA_RETRY_ATTEMPTS; attempt += 1) {
             const session = this.getSessionByNamespace(sessionId, namespace) ?? this.refreshSession(sessionId)
             if (!session?.metadata || session.namespace !== namespace) return { result: 'duplicate' }
 
             const notificationState = session.metadata.managerNotificationState ?? {}
             const existing = notificationState.terminal
+            if (existing && (existing.eventType !== 'terminal' || existing.childSessionId !== sessionId)) {
+                throw new Error('Invalid persisted manager terminal notification identity')
+            }
             if (existing?.status === 'sent'
                 || (existing?.status === 'sending' && (existing.claimExpiresAt ?? 0) > now)) {
                 return { result: 'duplicate' }
             }
 
             // A completed/error race must not send two contradictory terminal messages.
+            // The first claim also freezes the manager identity so a retry cannot
+            // drift to a different parent if the child metadata changes later.
+            const claimedManagerSessionId = existing?.managerSessionId ?? managerSessionId
             const claimedTerminalState = existing?.terminalState ?? terminalState
             const terminal: ManagerNotificationDelivery = {
                 eventType: 'terminal',
+                managerSessionId: claimedManagerSessionId,
+                childSessionId: sessionId,
                 terminalState: claimedTerminalState,
                 status: 'sending',
                 claimId,
@@ -892,7 +905,11 @@ export class SessionCache {
             if (result.result === 'error') throw new Error('Failed to claim manager terminal notification')
             this.refreshSession(sessionId)
             if (result.result === 'success') {
-                return { result: 'claimed', terminalState: claimedTerminalState }
+                return {
+                    result: 'claimed',
+                    managerSessionId: claimedManagerSessionId,
+                    terminalState: claimedTerminalState
+                }
             }
         }
         return { result: 'duplicate' }
@@ -914,6 +931,8 @@ export class SessionCache {
             }
             const terminal: ManagerNotificationDelivery = {
                 eventType: 'terminal',
+                managerSessionId: existing.managerSessionId,
+                childSessionId: existing.childSessionId,
                 terminalState: existing.terminalState,
                 status,
                 updatedAt: now

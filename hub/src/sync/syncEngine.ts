@@ -977,16 +977,15 @@ async uploadScratchlistAttachment(
     }
 
     private async notifyManagerSessionEnd(child: Session, reason?: SessionEndReason): Promise<void> {
-        const managerSessionId = child.metadata?.managerSessionId
-        if (!managerSessionId || managerSessionId === child.id) return
-        const manager = this.getSessionByNamespace(managerSessionId, child.namespace)
-        if (!manager) return
+        const linkedManagerSessionId = child.metadata?.managerSessionId
+        if (!linkedManagerSessionId || linkedManagerSessionId === child.id) return
 
         const claimId = randomUUID()
         const requestedState = reason === 'completed' ? 'completed' : 'failed'
         const claim = this.sessionCache.claimManagerTerminalNotification(
             child.id,
             child.namespace,
+            linkedManagerSessionId,
             requestedState,
             claimId,
             Date.now(),
@@ -995,9 +994,11 @@ async uploadScratchlistAttachment(
         if (claim.result !== 'claimed') return
 
         try {
-            let targetSessionId = managerSessionId
+            const manager = this.getSessionByNamespace(claim.managerSessionId, child.namespace)
+            if (!manager) throw new Error('Manager session is unavailable')
+            let targetSessionId = claim.managerSessionId
             if (!manager.active) {
-                const resumed = await this.resumeSession(managerSessionId, child.namespace)
+                const resumed = await this.resumeSession(claim.managerSessionId, child.namespace)
                 if (resumed.type !== 'success') throw new Error('Manager session resume failed')
                 targetSessionId = resumed.sessionId
             }
@@ -1005,7 +1006,7 @@ async uploadScratchlistAttachment(
             const outcome = claim.terminalState === 'completed' ? 'completed' : 'failed'
             await this.sendMessage(targetSessionId, {
                 text: `[HAPI agent notification] Child session "${childLabel}" (${child.id}) ${outcome}. Use inspect_peer for details if needed.`,
-                localId: `manager-notification:terminal:${managerSessionId}:${child.id}:${claim.terminalState}`,
+                localId: `manager-notification:terminal:${claim.managerSessionId}:${child.id}:${claim.terminalState}`,
                 sentFrom: 'webapp',
                 suppressDuplicateDelivery: true
             })

@@ -40,6 +40,8 @@ const SessionCapabilitiesSchema = z.object({
 
 const ManagerNotificationDeliverySchema = z.object({
     eventType: z.enum(['checkpoint', 'terminal']),
+    managerSessionId: z.string(),
+    childSessionId: z.string(),
     terminalState: z.enum(['completed', 'failed']).optional(),
     status: z.enum(['pending', 'sending', 'sent']),
     claimId: z.string().optional(),
