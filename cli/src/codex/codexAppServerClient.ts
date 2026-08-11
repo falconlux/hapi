@@ -70,6 +70,10 @@ type PendingRequest = {
     cleanup: () => void;
 };
 
+type CodexAppServerClientOptions = {
+    cwd?: string;
+};
+
 const STDERR_TAIL_MAX_CHARS = 4 * 1024;
 
 export class CodexAppServerStderrTail {
@@ -206,6 +210,10 @@ export class CodexAppServerClient extends JsonLineParser {
 
     static readonly DEFAULT_TIMEOUT_MS = 14 * 24 * 60 * 60 * 1000;
 
+    constructor(private readonly options: CodexAppServerClientOptions = {}) {
+        super();
+    }
+
     setStderrHandler(handler: ((text: string) => void) | null): void {
         this.stderrHandler = handler;
     }
@@ -219,6 +227,7 @@ export class CodexAppServerClient extends JsonLineParser {
         logger.debug(`[CodexAppServer] Starting ${codexCommand} app-server`);
         const stderrTail = new CodexAppServerStderrTail();
         this.process = spawn(codexCommand, ['app-server'], {
+            cwd: this.options.cwd,
             env: Object.keys(process.env).reduce((acc, key) => {
                 const value = process.env[key];
                 if (typeof value === 'string') acc[key] = value;

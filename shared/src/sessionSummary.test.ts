@@ -15,6 +15,8 @@ function makeSession(overrides: Partial<Session> = {}): Session {
     return {
         id: 'session-1',
         namespace: 'default',
+        seq: 1,
+        createdAt: 500,
         active: true,
         activeAt: 1000,
         updatedAt: 2000,
@@ -69,6 +71,13 @@ describe('getPendingRequestKinds', () => {
 })
 
 describe('toSessionSummary', () => {
+    it('includes the pinned state', () => {
+        expect(toSessionSummary(makeSession({ pinned: true })).pinned).toBe(true)
+        expect(toSessionSummary(makeSession({ globalPinned: true })).globalPinned).toBe(true)
+        expect(toSessionSummary(makeSession()).pinned).toBe(false)
+        expect(toSessionSummary(makeSession()).globalPinned).toBe(false)
+    })
+
     it('uses grokSessionId as the native resume token', () => {
         const summary = toSessionSummary(makeSession({
             metadata: {

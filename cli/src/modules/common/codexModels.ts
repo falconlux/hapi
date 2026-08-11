@@ -1,3 +1,4 @@
+import { homedir } from 'node:os';
 import type { CodexModelsResponse, CodexModelSummary } from '@hapi/protocol/apiTypes';
 import { CodexAppServerClient } from '@/codex/codexAppServerClient';
 import { getErrorMessage } from './rpcResponses';
@@ -157,7 +158,7 @@ async function loadCodexModels(includeHidden: boolean): Promise<CodexModelSummar
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
         const deadline = Date.now() + attemptTimeoutMs;
-        const client = new CodexAppServerClient();
+        const client = new CodexAppServerClient({ cwd: homedir() });
         let stderrTail = '';
         let shouldRetry = false;
         const state: { phase: 'connect' | 'initialize' | 'list' } = { phase: 'connect' };

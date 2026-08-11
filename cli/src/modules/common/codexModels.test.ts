@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('node:os', () => ({ homedir: () => '/neutral-home' }));
+
 const mocks = vi.hoisted(() => {
     type Attempt = {
         initializeError?: Error;
@@ -10,13 +12,15 @@ const mocks = vi.hoisted(() => {
     };
     const attempts: Attempt[] = [];
     const clients: MockClient[] = [];
+    const constructorOptions: unknown[] = [];
 
     class MockClient {
         private readonly attempt: Attempt;
         private stderrHandler: ((text: string) => void) | null = null;
         readonly disconnect = vi.fn(async () => undefined);
 
-        constructor() {
+        constructor(options?: unknown) {
+            constructorOptions.push(options);
             const attempt = attempts.shift();
             if (!attempt) throw new Error('Missing test attempt');
             this.attempt = attempt;
@@ -41,7 +45,7 @@ const mocks = vi.hoisted(() => {
         }
     }
 
-    return { attempts, clients, MockClient };
+    return { attempts, clients, constructorOptions, MockClient };
 });
 
 vi.mock('@/codex/codexAppServerClient', () => ({ CodexAppServerClient: mocks.MockClient }));
@@ -55,8 +59,15 @@ describe('listCodexModels', () => {
     beforeEach(() => {
         mocks.attempts.length = 0;
         mocks.clients.length = 0;
+        mocks.constructorOptions.length = 0;
         vi.restoreAllMocks();
         _resetCodexModelsForTests({ retryBaseDelayMs: 0, retryRandom: () => 0.5 });
+    });
+
+    it('starts discovery from the user home instead of the caller cwd', async () => {
+        mocks.attempts.push({ data: [] });
+        await listCodexModels();
+        expect(mocks.constructorOptions).toEqual([{ cwd: '/neutral-home' }]);
     });
 
     it('caches successful results and separates includeHidden', async () => {
