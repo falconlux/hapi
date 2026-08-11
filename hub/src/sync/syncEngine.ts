@@ -14,7 +14,7 @@ import {
 } from '@hapi/protocol/runnerCapabilities'
 import type { CursorChatStoreStatus, CursorMigrateOutcome, CursorMigrateToAcpRequest, MessageDeliveryMode, MessagesResponse, QueuedStateResponse, SlashCommandsResponse } from '@hapi/protocol/apiTypes'
 import type { SteerQueuedMessageResponse } from '@hapi/protocol/schemas'
-import type { AgentFlavor, CodexCollaborationMode, CopilotAgentMode, DecryptedMessage, PermissionMode, Session, SyncEvent } from '@hapi/protocol/types'
+import type { AgentFlavor, CodexCollaborationMode, CopilotAgentMode, DecryptedMessage, PermissionMode, Session, SessionGroup, SessionGroupsResponse, SyncEvent } from '@hapi/protocol/types'
 import { unwrapRoleWrappedRecordEnvelope } from '@hapi/protocol/messages'
 import type { Server } from 'socket.io'
 import { randomUUID } from 'node:crypto'
@@ -56,6 +56,7 @@ import {
     type RpcUploadFileResponse
 } from './rpcGateway'
 import { SessionCache } from './sessionCache'
+import { SessionGroupService } from './sessionGroupService'
 import { ingestNotifySummaryFromMessage } from './workGraphNotifyIngest'
 
 type PiResumeAttempt = NonNullable<NonNullable<Session['metadata']>['piResumeAttempt']>
@@ -172,6 +173,7 @@ export class SyncEngine {
     private readonly sessionCache: SessionCache
     private readonly machineCache: MachineCache
     private readonly messageService: MessageService
+    private readonly sessionGroupService: SessionGroupService
     private readonly rpcGateway: RpcGateway
     private inactivityTimer: NodeJS.Timeout | null = null
     /** Sessions that emitted `session-ready` (Cursor ACP or validated Pi get_state). */
@@ -207,6 +209,7 @@ export class SyncEngine {
         this.eventPublisher = new EventPublisher(sseManager, (event) => this.resolveNamespace(event))
         this.sessionCache = new SessionCache(store, this.eventPublisher)
         this.machineCache = new MachineCache(store, this.eventPublisher)
+        this.sessionGroupService = new SessionGroupService(store.sessionGroups, this.eventPublisher)
         this.messageService = new MessageService(
             store,
             io,
@@ -315,6 +318,26 @@ export class SyncEngine {
 
     getSessionsByNamespace(namespace: string): Session[] {
         return this.sessionCache.getSessionsByNamespace(namespace)
+    }
+
+    getSessionGroups(namespace: string, projectKey?: string): SessionGroupsResponse {
+        return this.sessionGroupService.list(namespace, projectKey)
+    }
+
+    createSessionGroup(namespace: string, projectKey: string, name: string): SessionGroup {
+        return this.sessionGroupService.create(namespace, projectKey, name)
+    }
+
+    renameSessionGroup(namespace: string, groupId: string, name: string): SessionGroup {
+        return this.sessionGroupService.rename(namespace, groupId, name)
+    }
+
+    deleteSessionGroup(namespace: string, groupId: string): void {
+        this.sessionGroupService.delete(namespace, groupId)
+    }
+
+    moveSessionsToGroup(namespace: string, sessionIds: string[], groupId: string | null): void {
+        this.sessionGroupService.moveSessions(namespace, sessionIds, groupId)
     }
 
     setSessionPinned(sessionId: string, pinned: boolean): void {

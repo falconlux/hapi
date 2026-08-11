@@ -66,6 +66,50 @@ export const WorktreeMetadataSchema = z.object({
 
 export type WorktreeMetadata = z.infer<typeof WorktreeMetadataSchema>
 
+export const SessionGroupIdSchema = z.string().uuid()
+export const SessionGroupNameSchema = z.string().trim().min(1).max(80)
+export const SessionGroupProjectKeySchema = z.string().trim().min(1).max(4096)
+
+export const SessionGroupSchema = z.object({
+    id: SessionGroupIdSchema,
+    projectKey: SessionGroupProjectKeySchema,
+    name: SessionGroupNameSchema,
+    createdAt: z.number().int().nonnegative(),
+    updatedAt: z.number().int().nonnegative()
+}).strict()
+export type SessionGroup = z.infer<typeof SessionGroupSchema>
+
+export const SessionGroupMembershipSchema = z.object({
+    sessionId: z.string().min(1),
+    groupId: SessionGroupIdSchema,
+    projectKey: SessionGroupProjectKeySchema,
+    updatedAt: z.number().int().nonnegative()
+}).strict()
+export type SessionGroupMembership = z.infer<typeof SessionGroupMembershipSchema>
+
+export const SessionGroupsResponseSchema = z.object({
+    groups: z.array(SessionGroupSchema),
+    memberships: z.array(SessionGroupMembershipSchema)
+}).strict()
+export type SessionGroupsResponse = z.infer<typeof SessionGroupsResponseSchema>
+
+export const CreateSessionGroupInputSchema = z.object({
+    projectKey: SessionGroupProjectKeySchema,
+    name: SessionGroupNameSchema
+}).strict()
+
+export const RenameSessionGroupInputSchema = z.object({
+    name: SessionGroupNameSchema
+}).strict()
+
+export const MoveSessionsToGroupInputSchema = z.object({
+    sessionIds: z.array(z.string().min(1)).min(1).max(100).refine(
+        (sessionIds) => new Set(sessionIds).size === sessionIds.length,
+        'sessionIds must be unique'
+    ),
+    groupId: SessionGroupIdSchema.nullable()
+}).strict()
+
 export const MetadataSchema = z.object({
     path: z.string(),
     host: z.string(),
@@ -612,6 +656,9 @@ export const SyncEventSchema = z.discriminatedUnion('type', [
              */
             resume: z.enum(['ok', 'gap']).optional()
         }).optional()
+    }),
+    SessionEventBaseSchema.extend({
+        type: z.literal('session-groups-updated')
     })
 ])
 

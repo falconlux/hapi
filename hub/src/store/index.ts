@@ -9,6 +9,7 @@ import type { StoredMessage } from './types'
 import { PushStore } from './pushStore'
 import { FcmStore } from './fcmStore'
 import { ScratchlistStore } from './scratchlistStore'
+import { SessionGroupStore } from './sessionGroupStore'
 import { SessionStore } from './sessionStore'
 import { UserStore } from './userStore'
 import { UsageStore } from './usageStore'
@@ -21,6 +22,8 @@ export type {
     StoredFcmDevice,
     StoredScratchlistEntry,
     StoredSession,
+    StoredSessionGroup,
+    StoredSessionGroupMembership,
     StoredUser,
     VersionedUpdateResult
 } from './types'
@@ -30,6 +33,8 @@ export { MessageStore } from './messageStore'
 export { PushStore } from './pushStore'
 export { FcmStore } from './fcmStore'
 export { ScratchlistStore } from './scratchlistStore'
+export { SessionGroupStore } from './sessionGroupStore'
+export { SessionGroupStoreError } from './sessionGroups'
 export { SessionStore } from './sessionStore'
 export { UserStore } from './userStore'
 export { UsageStore } from './usageStore'
@@ -40,7 +45,7 @@ export {
     WorkGraphValidationError
 } from './workGraph'
 
-const SCHEMA_VERSION: number = 23
+const SCHEMA_VERSION: number = 24
 const REQUIRED_TABLES = [
     'sessions',
     'machines',
@@ -53,7 +58,9 @@ const REQUIRED_TABLES = [
     'usage_events',
     'usage_scan_state',
     'events',
-    'event_links'
+    'event_links',
+    'session_groups',
+    'session_group_memberships'
 ] as const
 
 export class Store {
@@ -68,6 +75,7 @@ export class Store {
     readonly push: PushStore
     readonly fcm: FcmStore
     readonly scratchlist: ScratchlistStore
+    readonly sessionGroups: SessionGroupStore
     readonly usage: UsageStore
     readonly workGraph: WorkGraphStore
 
@@ -122,6 +130,7 @@ export class Store {
         this.push = new PushStore(this.db)
         this.fcm = new FcmStore(this.db)
         this.scratchlist = new ScratchlistStore(this.db)
+        this.sessionGroups = new SessionGroupStore(this.db)
         this.usage = new UsageStore(this.db)
         this.workGraph = new WorkGraphStore(this.db)
     }
@@ -302,6 +311,7 @@ export class Store {
             20: () => this.migrateFromV20ToV21(),
             21: () => this.migrateFromV21ToV22(),
             22: () => this.migrateFromV22ToV23(),
+            23: () => this.migrateFromV23ToV24(),
         })
 
         if (currentVersion === 0) {
@@ -545,6 +555,7 @@ export class Store {
             CREATE INDEX IF NOT EXISTS idx_event_links_namespace_to
                 ON event_links(namespace, to_event_id);
         `)
+        this.createSessionGroupTables()
     }
 
     private migrateLegacySchemaIfNeeded(): void {
@@ -969,6 +980,40 @@ export class Store {
                 ON event_links(namespace, from_event_id);
             CREATE INDEX IF NOT EXISTS idx_event_links_namespace_to
                 ON event_links(namespace, to_event_id);
+        `)
+    }
+
+    private migrateFromV23ToV24(): void {
+        this.createSessionGroupTables()
+    }
+
+    private createSessionGroupTables(): void {
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS session_groups (
+                id TEXT PRIMARY KEY,
+                namespace TEXT NOT NULL,
+                project_key TEXT NOT NULL,
+                name TEXT NOT NULL COLLATE NOCASE,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                UNIQUE(namespace, project_key, name),
+                UNIQUE(id, namespace, project_key)
+            );
+            CREATE INDEX IF NOT EXISTS idx_session_groups_namespace_project
+                ON session_groups(namespace, project_key);
+
+            CREATE TABLE IF NOT EXISTS session_group_memberships (
+                session_id TEXT PRIMARY KEY,
+                group_id TEXT NOT NULL,
+                namespace TEXT NOT NULL,
+                project_key TEXT NOT NULL,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+                FOREIGN KEY (group_id, namespace, project_key)
+                    REFERENCES session_groups(id, namespace, project_key) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_session_group_memberships_scope
+                ON session_group_memberships(namespace, project_key, group_id);
         `)
     }
 

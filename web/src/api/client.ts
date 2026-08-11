@@ -25,6 +25,9 @@ import type {
     VisibilityPayload,
     HapiSessionExport,
     SessionResponse,
+    SessionGroupsResponse,
+    CreateSessionGroupResponse,
+    RenameSessionGroupResponse,
     SessionsResponse
 } from '@/types/api'
 import type {
@@ -244,6 +247,43 @@ export class ApiClient {
 
     async getSessions(): Promise<SessionsResponse> {
         return await this.request<SessionsResponse>('/api/sessions')
+    }
+
+    async getSessionGroups(projectKey?: string): Promise<SessionGroupsResponse> {
+        const params = new URLSearchParams()
+        if (projectKey) params.set('projectKey', projectKey)
+        const query = params.size > 0 ? `?${params.toString()}` : ''
+        return await this.request<SessionGroupsResponse>(`/api/session-groups${query}`)
+    }
+
+    async createSessionGroup(projectKey: string, name: string): Promise<CreateSessionGroupResponse> {
+        return await this.request<CreateSessionGroupResponse>('/api/session-groups', {
+            method: 'POST',
+            body: JSON.stringify({ projectKey, name })
+        })
+    }
+
+    async renameSessionGroup(groupId: string, name: string): Promise<RenameSessionGroupResponse> {
+        return await this.request<RenameSessionGroupResponse>(
+            `/api/session-groups/${encodeURIComponent(groupId)}`,
+            {
+                method: 'PATCH',
+                body: JSON.stringify({ name })
+            }
+        )
+    }
+
+    async deleteSessionGroup(groupId: string): Promise<void> {
+        await this.request(`/api/session-groups/${encodeURIComponent(groupId)}`, {
+            method: 'DELETE'
+        })
+    }
+
+    async moveSessionsToGroup(sessionIds: string[], groupId: string | null): Promise<void> {
+        await this.request('/api/session-groups/memberships', {
+            method: 'PATCH',
+            body: JSON.stringify({ sessionIds, groupId })
+        })
     }
 
     async getPushVapidPublicKey(): Promise<PushVapidPublicKeyResponse> {

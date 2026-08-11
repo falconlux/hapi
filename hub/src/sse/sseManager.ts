@@ -316,6 +316,10 @@ export class SSEManager {
             return true
         }
 
+        if (event.type === 'session-groups-updated') {
+            return true
+        }
+
         if (connection.all) {
             return true
         }

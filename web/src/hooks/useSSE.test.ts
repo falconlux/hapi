@@ -8,8 +8,16 @@ import {
     isNewerVersionedPatch,
     isRenderIrrelevantPatch,
     isRenderIrrelevantSessionPatch,
+    shouldInvalidateSessionGroupsForEvent,
     shouldInvalidateSessionListForEvent
 } from './useSSE'
+
+describe('session group SSE invalidation', () => {
+    it('invalidates only session group updates', () => {
+        expect(shouldInvalidateSessionGroupsForEvent('session-groups-updated')).toBe(true)
+        expect(shouldInvalidateSessionGroupsForEvent('session-updated')).toBe(false)
+    })
+})
 
 function makeSummary(overrides: Partial<SessionSummary> = {}): SessionSummary {
     return {

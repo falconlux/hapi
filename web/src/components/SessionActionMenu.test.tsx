@@ -74,6 +74,19 @@ describe('SessionActionMenu - Pin action', () => {
     })
 })
 
+describe('SessionActionMenu - session groups', () => {
+    it('renders, fires, and closes the move-to-group action when provided', () => {
+        const onMoveToGroup = vi.fn()
+        const onClose = vi.fn()
+        renderMenu({ onMoveToGroup, onClose })
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Move to group' }))
+
+        expect(onMoveToGroup).toHaveBeenCalledOnce()
+        expect(onClose).toHaveBeenCalledOnce()
+    })
+})
+
 describe('SessionActionMenu - Reopen action', () => {
     it('renders the Reopen item on inactive sessions when onReopen is provided', () => {
         renderMenu({ sessionActive: false })

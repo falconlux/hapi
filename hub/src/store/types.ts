@@ -24,6 +24,23 @@ export type StoredSession = {
     seq: number
 }
 
+export type StoredSessionGroup = {
+    id: string
+    namespace: string
+    projectKey: string
+    name: string
+    createdAt: number
+    updatedAt: number
+}
+
+export type StoredSessionGroupMembership = {
+    sessionId: string
+    groupId: string
+    namespace: string
+    projectKey: string
+    updatedAt: number
+}
+
 export type StoredMachine = {
     id: string
     namespace: string

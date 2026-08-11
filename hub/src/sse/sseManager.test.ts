@@ -35,6 +35,61 @@ describe('SSEManager namespace filtering', () => {
         expect(receivedBeta).toHaveLength(0)
     })
 
+    it('broadcasts session group updates to global and session-scoped connections in the same namespace only', () => {
+        const manager = new SSEManager(0, new VisibilityTracker())
+        const received: string[] = []
+
+        for (const subscription of [
+            { id: 'alpha-global', namespace: 'alpha', all: true },
+            { id: 'alpha-session', namespace: 'alpha', all: false, sessionId: 'session-1' },
+            { id: 'beta-global', namespace: 'beta', all: true },
+            { id: 'beta-session', namespace: 'beta', all: false, sessionId: 'session-1' }
+        ]) {
+            manager.subscribe({
+                ...subscription,
+                send: () => {
+                    received.push(subscription.id)
+                },
+                sendHeartbeat: () => {}
+            })
+        }
+
+        manager.broadcast({ type: 'session-groups-updated', namespace: 'alpha' })
+
+        expect(received.sort()).toEqual(['alpha-global', 'alpha-session'])
+    })
+
+    it('keeps existing session and machine scoped filtering unchanged', () => {
+        const manager = new SSEManager(0, new VisibilityTracker())
+        const received: string[] = []
+        manager.subscribe({
+            id: 'session',
+            namespace: 'alpha',
+            sessionId: 'session-1',
+            send: (event) => {
+                received.push(event.type)
+            },
+            sendHeartbeat: () => {}
+        })
+        manager.subscribe({
+            id: 'machine',
+            namespace: 'alpha',
+            machineId: 'machine-1',
+            send: (event) => {
+                received.push(event.type)
+            },
+            sendHeartbeat: () => {}
+        })
+
+        manager.broadcast({ type: 'session-updated', sessionId: 'session-2', namespace: 'alpha' })
+        manager.broadcast({ type: 'machine-updated', machineId: 'machine-2', namespace: 'alpha' })
+        expect(received).toEqual([])
+
+        manager.broadcast({ type: 'session-updated', sessionId: 'session-1', namespace: 'alpha' })
+        manager.broadcast({ type: 'machine-updated', machineId: 'machine-1', namespace: 'alpha' })
+        expect(received).toEqual(['session-updated', 'machine-updated'])
+    })
+
     it('broadcasts connection-changed to all namespaces', () => {
         const manager = new SSEManager(0, new VisibilityTracker())
         const received: Array<{ id: string; event: SyncEvent }> = []

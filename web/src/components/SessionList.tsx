@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { SessionSummary } from '@/types/api'
+import type { SessionGroup as CustomSessionGroup, SessionSummary } from '@/types/api'
 import type { ApiClient } from '@/api/client'
 import { useLongPress } from '@/hooks/useLongPress'
 import { usePlatform } from '@/hooks/usePlatform'
@@ -8,6 +8,8 @@ import { SessionActionMenu } from '@/components/SessionActionMenu'
 import { SessionExportDialog } from '@/components/SessionExportDialog'
 import { RenameSessionDialog } from '@/components/RenameSessionDialog'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { MoveSessionGroupDialog } from '@/components/MoveSessionGroupDialog'
+import { SessionGroupNameDialog } from '@/components/SessionGroupNameDialog'
 import { CopyIcon, CheckIcon } from '@/components/icons'
 
 function PinnedSectionIcon(props: { className?: string }) {
@@ -16,6 +18,15 @@ function PinnedSectionIcon(props: { className?: string }) {
             <path d="M12 17v5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
             <path d="M5 17h14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" />
             <path d="M7 4V2h10v2l-2 5v4l2 2H7l2-2V9Z" />
+        </svg>
+    )
+}
+
+function SessionGroupIcon(props: { className?: string }) {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className} aria-hidden="true">
+            <path d="M3 6h6l2 2h10v10H3Z" />
+            <path d="M8 13h8M12 10v6" />
         </svg>
     )
 }
@@ -43,6 +54,9 @@ import { SessionRowSummary } from '@/components/SessionRowSummary'
 import { Spinner } from '@/components/Spinner'
 import { transferComposerDraftThenNavigate } from '@/lib/composer-draft-transfer'
 import { useToast } from '@/lib/toast-context'
+import { useSessionGroups } from '@/hooks/queries/useSessionGroups'
+import { useSessionGroupActions } from '@/hooks/mutations/useSessionGroupActions'
+import { buildSecondarySessionGroups, getSessionProjectKey, type SecondarySessionGroup } from '@/lib/session-groups'
 
 export { getWorktreeSessionLabel } from '@/lib/sessionWorktreeLabel'
 
@@ -872,6 +886,10 @@ function SessionItem(props: {
     inRunningSection?: boolean
     projectLabel?: string
     machineLabel?: string
+    availableSessionGroups?: CustomSessionGroup[]
+    currentSessionGroupId?: string | null
+    onMoveToSessionGroup?: (sessionId: string, groupId: string | null) => Promise<void>
+    sessionGroupMutationPending?: boolean
 }) {
     const { t } = useTranslation()
     const { addToast } = useToast()
@@ -883,6 +901,7 @@ function SessionItem(props: {
     const [exportOpen, setExportOpen] = useState(false)
     const [archiveOpen, setArchiveOpen] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
+    const [moveGroupOpen, setMoveGroupOpen] = useState(false)
     const {
         status: cursorChatStoreStatus,
         isApplicable: cursorChatStoreApplicable,
@@ -1009,6 +1028,9 @@ function SessionItem(props: {
                 sessionPinned={Boolean(s.pinned)}
                 sessionGlobalPinned={Boolean(s.globalPinned)}
                 onSetPinMode={(mode) => void handleSetPinMode(mode)}
+                onMoveToGroup={props.onMoveToSessionGroup && ((props.availableSessionGroups?.length ?? 0) > 0 || Boolean(props.currentSessionGroupId))
+                    ? () => setMoveGroupOpen(true)
+                    : undefined}
                 onRename={() => setRenameOpen(true)}
                 onExport={() => setExportOpen(true)}
                 onArchive={() => setArchiveOpen(true)}
@@ -1040,6 +1062,17 @@ function SessionItem(props: {
                     currentName={sessionName}
                     onRename={renameSession}
                     isPending={isPending}
+                />
+            ) : null}
+
+            {moveGroupOpen && props.onMoveToSessionGroup ? (
+                <MoveSessionGroupDialog
+                    isOpen={true}
+                    groups={props.availableSessionGroups ?? []}
+                    currentGroupId={props.currentSessionGroupId ?? null}
+                    onClose={() => setMoveGroupOpen(false)}
+                    onMove={async (groupId) => await props.onMoveToSessionGroup?.(s.id, groupId)}
+                    isPending={Boolean(props.sessionGroupMutationPending)}
                 />
             ) : null}
 
@@ -1142,6 +1175,11 @@ export function SessionList(props: {
     const [showUnreadOnly, setShowUnreadOnly] = useState(false)
     const { pinInProgressSessions } = usePinInProgressSessions()
     const { machineFilter, setMachineFilter } = useSessionListMachineFilter()
+    const sessionGroupsQuery = useSessionGroups(api)
+    const sessionGroupActions = useSessionGroupActions(api)
+    const [createGroupProjectKey, setCreateGroupProjectKey] = useState<string | null>(null)
+    const [renameGroup, setRenameGroup] = useState<CustomSessionGroup | null>(null)
+    const [deleteGroup, setDeleteGroup] = useState<CustomSessionGroup | null>(null)
     const showDetailedStatus = sessionListStatusMode === 'detailed'
     const [searchQuery, setSearchQuery] = useState('')
     const [searchExpanded, setSearchExpanded] = useState(false)
@@ -1151,6 +1189,23 @@ export function SessionList(props: {
     const normalizedQuery = normalizeSearch(searchQuery)
     const timeRange = getSessionTimeRange(customStart, customEnd)
     const isFiltering = normalizedQuery.length > 0 || timeRange !== null
+
+    const sessionGroupMembershipBySession = useMemo(
+        () => new Map(sessionGroupsQuery.memberships.map((membership) => [membership.sessionId, membership])),
+        [sessionGroupsQuery.memberships]
+    )
+    const sessionGroupsByProject = useMemo(() => {
+        const groups = new Map<string, CustomSessionGroup[]>()
+        for (const group of sessionGroupsQuery.groups) {
+            const projectGroups = groups.get(group.projectKey) ?? []
+            projectGroups.push(group)
+            groups.set(group.projectKey, projectGroups)
+        }
+        for (const projectGroups of groups.values()) {
+            projectGroups.sort((a, b) => a.createdAt - b.createdAt || a.name.localeCompare(b.name))
+        }
+        return groups
+    }, [sessionGroupsQuery.groups])
 
     useEffect(() => {
         // 中文注释：监听导入标记变化，让列表在“导入完成”或“用户已在 Hapi 中继续会话”后立即刷新时间文案。
@@ -1178,6 +1233,23 @@ export function SessionList(props: {
         },
         [props.sessions, selectedSessionId, showActiveSessionsOnly]
     )
+    const getSessionGroupingProps = (session: SessionSummary) => {
+        const projectKey = getSessionProjectKey(session)
+        const availableSessionGroups = sessionGroupsByProject.get(projectKey) ?? []
+        const membership = sessionGroupMembershipBySession.get(session.id)
+        const currentSessionGroupId = membership?.projectKey === projectKey
+            && availableSessionGroups.some((group) => group.id === membership.groupId)
+            ? membership.groupId
+            : null
+        return {
+            availableSessionGroups,
+            currentSessionGroupId,
+            onMoveToSessionGroup: async (sessionId: string, groupId: string | null) => {
+                await sessionGroupActions.moveSessions([sessionId], groupId)
+            },
+            sessionGroupMutationPending: sessionGroupActions.isPending
+        }
+    }
     const sessionActivityDates = useMemo(
         () => new Set(allSessions.map(session => formatDateValue(new Date(session.updatedAt)))),
         [allSessions]
@@ -1293,6 +1365,9 @@ export function SessionList(props: {
     const [collapseOverrides, setCollapseOverrides] = useState<Map<string, boolean>>(
         () => new Map()
     )
+    const [secondaryCollapseOverrides, setSecondaryCollapseOverrides] = useState<Map<string, boolean>>(
+        () => new Map()
+    )
     const [runningSectionCollapsed, setRunningSectionCollapsed] = useState(false)
     const [pinnedSectionCollapsed, setPinnedSectionCollapsed] = useState(false)
     const autoExpandedSelectedSessionKeyRef = useRef<string | null>(null)
@@ -1310,6 +1385,29 @@ export function SessionList(props: {
         setCollapseOverrides(prev => {
             const next = new Map(prev)
             next.set(groupKey, !isCollapsed)
+            return next
+        })
+    }
+
+    const secondaryGroupKey = (directoryGroupKey: string, groupId: string | null) => (
+        `secondary::${directoryGroupKey}::${groupId ?? 'ungrouped'}`
+    )
+
+    const isSecondaryGroupCollapsed = (directoryGroup: SessionGroup, group: SecondarySessionGroup): boolean => {
+        if (isFiltering) return false
+        const key = secondaryGroupKey(directoryGroup.key, group.id)
+        const override = secondaryCollapseOverrides.get(key)
+        if (override !== undefined) return override
+        const hasSelectedSession = selectedSessionId
+            ? group.sessions.some((session) => session.id === selectedSessionId)
+            : false
+        return !group.hasActiveSession && !group.hasPinnedSession && !hasSelectedSession
+    }
+
+    const toggleSecondaryGroup = (directoryGroupKey: string, groupId: string | null, isCollapsed: boolean) => {
+        setSecondaryCollapseOverrides((previous) => {
+            const next = new Map(previous)
+            next.set(secondaryGroupKey(directoryGroupKey, groupId), !isCollapsed)
             return next
         })
     }
@@ -1393,6 +1491,25 @@ export function SessionList(props: {
         const groupTitle = showMachineFilterBar && activeMachineFilter === null
             ? `${group.displayName} · ${resolveMachineLabel(group.machineId)}`
             : group.displayName
+        const secondaryGroups = buildSecondarySessionGroups(
+            group.directory,
+            group.sessions,
+            sessionGroupsQuery.groups,
+            sessionGroupsQuery.memberships,
+            t('session.group.ungrouped')
+        )
+        const visibleSecondaryGroups = new Map(
+            buildSecondarySessionGroups(
+                group.directory,
+                visibleGroupSessions,
+                sessionGroupsQuery.groups,
+                sessionGroupsQuery.memberships,
+                t('session.group.ungrouped')
+            ).map((secondaryGroup) => [secondaryGroup.id, secondaryGroup])
+        )
+        const customGroupsById = new Map(
+            sessionGroupsQuery.groups.map((sessionGroup) => [sessionGroup.id, sessionGroup])
+        )
         return (
             <div key={group.key}>
                 <div
@@ -1412,6 +1529,20 @@ export function SessionList(props: {
                         />
                     ) : null}
                     <CopyPathButton path={group.directory} className="opacity-0 group-hover/project:opacity-100 transition-opacity duration-150" />
+                    {canStartInGroupDirectory ? (
+                        <button
+                            type="button"
+                            onClick={(event) => {
+                                event.stopPropagation()
+                                setCreateGroupProjectKey(group.directory)
+                            }}
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--app-hint)] opacity-70 transition-colors hover:bg-[var(--app-secondary-bg)] hover:text-[var(--app-link)] hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)]"
+                            title={t('session.group.create')}
+                            aria-label={t('session.group.create')}
+                        >
+                            <SessionGroupIcon className="h-3.5 w-3.5" />
+                        </button>
+                    ) : null}
                     {onNewSessionInDirectory && canStartInGroupDirectory ? (
                         <button
                             type="button"
@@ -1434,28 +1565,90 @@ export function SessionList(props: {
                     </span>
                 </div>
 
-                {/* Sessions */}
+                {/* Secondary session groups */}
                 <div className="collapsible-panel" data-open={!isCollapsed || undefined}>
                     <div className="collapsible-inner">
                     <div className="flex flex-col gap-0.5 ml-3 pl-1 py-1">
-                        {visibleGroupSessions.map((s, index) => (
-                            <div key={s.id} className="contents">
-                                {shouldShowPinnedDivider(visibleGroupSessions, index) ? (
-                                    <div
-                                        className="ml-2.5 mr-2 my-1 border-t border-[var(--app-border)]"
-                                        aria-hidden="true"
-                                    />
-                                ) : null}
-                                <SessionItem
-                                    session={s}
-                                    onSelect={props.onSelect}
-                                    showPath={false}
-                                    api={api}
-                                    selected={s.id === selectedSessionId}
-                                    showDetailedStatus={showDetailedStatus}
-                                />
-                            </div>
-                        ))}
+                        {secondaryGroups.map((secondaryGroup) => {
+                            const secondaryCollapsed = isSecondaryGroupCollapsed(group, secondaryGroup)
+                            const visibleSecondarySessions = visibleSecondaryGroups.get(secondaryGroup.id)?.sessions ?? []
+                            const customGroup = secondaryGroup.id
+                                ? customGroupsById.get(secondaryGroup.id) ?? null
+                                : null
+                            return (
+                                <div key={secondaryGroup.id ?? 'ungrouped'}>
+                                    <div className="group/subgroup flex min-w-0 w-full select-none items-center gap-1 rounded-md px-1.5 py-1 text-[var(--app-hint)] transition-colors hover:bg-[var(--app-subtle-bg)]">
+                                        <button
+                                            type="button"
+                                            className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)]"
+                                            aria-expanded={!secondaryCollapsed}
+                                            onClick={() => toggleSecondaryGroup(group.key, secondaryGroup.id, secondaryCollapsed)}
+                                        >
+                                            <ChevronIcon className="h-3 w-3 shrink-0" collapsed={secondaryCollapsed} />
+                                            <SessionGroupIcon className="h-3.5 w-3.5 shrink-0" />
+                                            <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--app-fg)]">
+                                                {secondaryGroup.name}
+                                            </span>
+                                            {secondaryGroup.thinkingCount > 0 ? (
+                                                <span className="shrink-0 text-[10px] text-[var(--app-badge-success-text)]">
+                                                    {t('session.group.thinkingCount', { n: secondaryGroup.thinkingCount })}
+                                                </span>
+                                            ) : null}
+                                            {secondaryGroup.pendingCount > 0 ? (
+                                                <span className="shrink-0 text-[10px] text-[var(--app-badge-warning-text)]">
+                                                    {t('session.group.pendingCount', { n: secondaryGroup.pendingCount })}
+                                                </span>
+                                            ) : null}
+                                            <span className="shrink-0 text-[10px] tabular-nums">({secondaryGroup.count})</span>
+                                        </button>
+                                        {customGroup ? (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    className="rounded p-1 opacity-100 transition-opacity hover:bg-[var(--app-secondary-bg)] sm:opacity-0 sm:group-hover/subgroup:opacity-100 focus:opacity-100"
+                                                    title={t('session.group.rename')}
+                                                    aria-label={t('session.group.rename')}
+                                                    onClick={() => setRenameGroup(customGroup)}
+                                                >
+                                                    <span aria-hidden="true">✎</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="rounded p-1 text-red-500 opacity-100 transition-opacity hover:bg-red-500/10 sm:opacity-0 sm:group-hover/subgroup:opacity-100 focus:opacity-100"
+                                                    title={t('session.group.delete')}
+                                                    aria-label={t('session.group.delete')}
+                                                    onClick={() => setDeleteGroup(customGroup)}
+                                                >
+                                                    <span aria-hidden="true">×</span>
+                                                </button>
+                                            </>
+                                        ) : null}
+                                    </div>
+                                    <div className="collapsible-panel" data-open={!secondaryCollapsed || undefined}>
+                                        <div className="collapsible-inner">
+                                            <div className="ml-3 flex flex-col gap-0.5 border-l border-[var(--app-divider)] pl-1 py-0.5">
+                                                {visibleSecondarySessions.map((s, index) => (
+                                                    <div key={s.id} className="contents">
+                                                        {shouldShowPinnedDivider(visibleSecondarySessions, index) ? (
+                                                            <div className="ml-2.5 mr-2 my-1 border-t border-[var(--app-border)]" aria-hidden="true" />
+                                                        ) : null}
+                                                        <SessionItem
+                                                            session={s}
+                                                            onSelect={props.onSelect}
+                                                            showPath={false}
+                                                            api={api}
+                                                            selected={s.id === selectedSessionId}
+                                                            showDetailedStatus={showDetailedStatus}
+                                                            {...getSessionGroupingProps(s)}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })}
                         {group.sessions.length > sessionPreviewLimit && (hiddenSessionCount > 0 || canShowFewerSessions) ? (
                             <div className="ml-2.5 mr-2 my-1 flex gap-1.5">
                                 {canShowFewerSessions ? (
@@ -1540,6 +1733,28 @@ export function SessionList(props: {
             return changed ? next : prev
         })
     }, [allGroups])
+
+    useEffect(() => {
+        setSecondaryCollapseOverrides((previous) => {
+            if (previous.size === 0) return previous
+            const knownKeys = new Set<string>()
+            for (const group of allGroups) {
+                knownKeys.add(secondaryGroupKey(group.key, null))
+                for (const customGroup of sessionGroupsByProject.get(group.directory) ?? []) {
+                    knownKeys.add(secondaryGroupKey(group.key, customGroup.id))
+                }
+            }
+            const next = new Map(previous)
+            let changed = false
+            for (const key of next.keys()) {
+                if (!knownKeys.has(key)) {
+                    next.delete(key)
+                    changed = true
+                }
+            }
+            return changed ? next : previous
+        })
+    }, [allGroups, sessionGroupsByProject])
 
     // Clean up reveal caps for groups that no longer exist.
     useEffect(() => {
@@ -1761,6 +1976,11 @@ export function SessionList(props: {
             ) : null}
             <div ref={scrollContainerRef} className="app-scroll-y session-list-scrollbar-left min-h-0 flex-1">
             <div className="mx-auto flex w-full max-w-content flex-col gap-1 pl-1.5 pr-2 pb-2">
+                {sessionGroupsQuery.error ? (
+                    <div role="alert" className="px-3 py-2 text-xs text-red-500">
+                        {t('session.group.loadError')}
+                    </div>
+                ) : null}
                 {props.sessions.length === 0 && !props.isLoading ? (
                     <SessionsEmptyState
                         onNewSession={props.onNewSession}
@@ -1814,6 +2034,7 @@ export function SessionList(props: {
                                             api={api}
                                             selected={s.id === selectedSessionId}
                                             showDetailedStatus={showDetailedStatus}
+                                            {...getSessionGroupingProps(s)}
                                             inRunningSection
                                             projectLabel={getGroupDisplayName(s.metadata?.worktree?.basePath ?? s.metadata?.path ?? 'Other')}
                                             machineLabel={resolveMachineLabel(s.metadata?.machineId ?? null)}
@@ -1875,6 +2096,7 @@ export function SessionList(props: {
                                                     api={api}
                                                     selected={s.id === selectedSessionId}
                                                     showDetailedStatus={showDetailedStatus}
+                                                    {...getSessionGroupingProps(s)}
                                                     inRunningSection
                                                     projectLabel={getGroupDisplayName(s.metadata?.worktree?.basePath ?? s.metadata?.path ?? 'Other')}
                                                     machineLabel={resolveMachineLabel(s.metadata?.machineId ?? null)}
@@ -1892,6 +2114,46 @@ export function SessionList(props: {
             </div>
             </div>
             </div>
+            {createGroupProjectKey ? (
+                <SessionGroupNameDialog
+                    isOpen={true}
+                    title={t('session.group.createTitle')}
+                    onClose={() => setCreateGroupProjectKey(null)}
+                    onSubmit={async (name) => {
+                        await sessionGroupActions.createGroup(createGroupProjectKey, name)
+                    }}
+                    isPending={sessionGroupActions.isPending}
+                />
+            ) : null}
+            {renameGroup ? (
+                <SessionGroupNameDialog
+                    isOpen={true}
+                    title={t('session.group.renameTitle')}
+                    initialName={renameGroup.name}
+                    onClose={() => setRenameGroup(null)}
+                    onSubmit={async (name) => {
+                        await sessionGroupActions.renameGroup(renameGroup.id, name)
+                    }}
+                    isPending={sessionGroupActions.isPending}
+                />
+            ) : null}
+            {deleteGroup ? (
+                <ConfirmDialog
+                    isOpen={true}
+                    onClose={() => setDeleteGroup(null)}
+                    title={t('session.group.deleteTitle')}
+                    description={t('session.group.deleteDescription', { name: deleteGroup.name })}
+                    confirmLabel={t('session.group.delete')}
+                    confirmingLabel={t('session.group.deleting')}
+                    onConfirm={async () => {
+                        await sessionGroupActions.deleteGroup(deleteGroup.id)
+                        setDeleteGroup(null)
+                    }}
+                    isPending={sessionGroupActions.isPending}
+                    destructive
+                    centerTitle
+                />
+            ) : null}
         </div>
     )
 }

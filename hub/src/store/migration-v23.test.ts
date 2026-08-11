@@ -13,8 +13,8 @@ afterEach(() => {
     }
 })
 
-describe('schema migration v22 to v23', () => {
-    it('adds events and event_links tables to a V22 database', () => {
+describe('schema migration v22 to current', () => {
+    it('adds events, event_links, and session group tables to a V22 database', () => {
         const dir = mkdtempSync(join(tmpdir(), 'hapi-migration-v23-'))
         tempDirs.push(dir)
         const dbPath = join(dir, 'hapi.db')
@@ -37,10 +37,14 @@ describe('schema migration v22 to v23', () => {
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'event_links'"
         ).get() as { name: string } | null
         const version = internalDb.prepare('PRAGMA user_version').get() as { user_version: number }
+        const groups = internalDb.prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'session_groups'"
+        ).get() as { name: string } | null
 
         expect(events?.name).toBe('events')
         expect(links?.name).toBe('event_links')
-        expect(version.user_version).toBe(23)
+        expect(groups?.name).toBe('session_groups')
+        expect(version.user_version).toBe(24)
         migrated.close()
     })
 })

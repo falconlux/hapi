@@ -46,6 +46,10 @@ export function shouldInvalidateSessionListForEvent(scope: SSEScope, eventType: 
     return scope === 'global' && eventType === 'messages-invalidated'
 }
 
+export function shouldInvalidateSessionGroupsForEvent(eventType: SyncEvent['type']): boolean {
+    return eventType === 'session-groups-updated'
+}
+
 // Version-monotonicity gate for structured patches carrying metadata or
 // agentState. SSE reconnects + per-query invalidation can leave the cache
 // holding state that's NEWER than a buffered older patch about to replay;
@@ -764,6 +768,11 @@ export function useSSE(options: {
 
             if (event.type === 'toast') {
                 onToastRef.current?.(event)
+                return
+            }
+
+            if (shouldInvalidateSessionGroupsForEvent(event.type)) {
+                void queryClient.invalidateQueries({ queryKey: queryKeys.sessionGroups })
                 return
             }
 

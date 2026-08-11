@@ -5,6 +5,7 @@ import type {
     Machine,
     RunnerState,
     Session,
+    SessionGroup,
     SessionSummary,
     SyncEvent as ProtocolSyncEvent,
     WorktreeMetadata
@@ -63,6 +64,9 @@ export type {
     PendingRequestKind,
     RunnerState,
     Session,
+    SessionGroup,
+    SessionGroupMembership,
+    SessionGroupsResponse,
     SessionPatch,
     SessionSummary,
     SessionSummaryMetadata,
@@ -75,6 +79,9 @@ export type {
     TodoItem,
     WorktreeMetadata
 } from '@hapi/protocol/types'
+
+export type CreateSessionGroupResponse = { group: SessionGroup }
+export type RenameSessionGroupResponse = { group: SessionGroup }
 
 export type { HapiSessionExport } from '@hapi/protocol/sessionExport'
 

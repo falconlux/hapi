@@ -5,9 +5,9 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Store } from './index'
 
-describe('Store V16->V23 migration: usage index ladder', () => {
+describe('Store V16->V24 migration: usage index ladder', () => {
     it('creates every derived usage table and preserves session messages', () => {
-        const directory = mkdtempSync(join(tmpdir(), 'hapi-migration-v16-to-v23-'))
+        const directory = mkdtempSync(join(tmpdir(), 'hapi-migration-v16-to-v24-'))
         const dbPath = join(directory, 'test.db')
         let store: Store | undefined
 
@@ -46,11 +46,13 @@ describe('Store V16->V23 migration: usage index ladder', () => {
             )
             const version = internalDb.prepare('PRAGMA user_version').get() as { user_version: number }
 
-            expect(version.user_version).toBe(23)
+            expect(version.user_version).toBe(24)
             expect(tableNames).toContain('usage_events')
             expect(tableNames).toContain('usage_scan_state')
             expect(tableNames).toContain('events')
             expect(tableNames).toContain('event_links')
+            expect(tableNames).toContain('session_groups')
+            expect(tableNames).toContain('session_group_memberships')
             expect(usageColumns).toContain('last_input_tokens')
             expect(usageColumns).toContain('last_output_tokens')
             expect(usageColumns).toContain('last_cache_read_tokens')
