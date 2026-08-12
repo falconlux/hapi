@@ -125,6 +125,7 @@ describe('SessionList secondary groups', () => {
         expect(screen.queryByText('Ungrouped')).not.toBeInTheDocument()
         expect(document.querySelector('[data-session-group-kind="direct"]')).toBeNull()
         expect(screen.getByText('Grouped session')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /Expand|Collapse/ })).not.toBeInTheDocument()
     })
 
     it('moves a session from a named group to the direct directory list after membership refresh', async () => {
@@ -193,18 +194,27 @@ describe('SessionList secondary groups', () => {
         expect(screen.getByRole('menuitem', { name: 'Move to group' })).toBeInTheDocument()
     })
 
-    it('applies the directory preview limit once across direct sessions and named groups without losing sessions', async () => {
-        const groupId = '11111111-1111-4111-8111-111111111111'
-        const sessions = Array.from({ length: 10 }, (_, index) => makeSession(
-            `session-${index + 1}`,
-            `Session ${index + 1}`
-        )).map((session, index) => ({ ...session, updatedAt: 100 - index }))
+    it('renders preview controls inside each large named group and keeps their pagination independent', async () => {
+        const reviewGroupId = '11111111-1111-4111-8111-111111111111'
+        const buildGroupId = '22222222-2222-4222-8222-222222222222'
+        const reviewSessions = Array.from({ length: 10 }, (_, index) => ({
+            ...makeSession(`review-${index + 1}`, `Review ${index + 1}`),
+            updatedAt: 200 - index
+        }))
+        const buildSessions = Array.from({ length: 10 }, (_, index) => ({
+            ...makeSession(`build-${index + 1}`, `Build ${index + 1}`),
+            updatedAt: 100 - index
+        }))
+        const sessions = [...reviewSessions, ...buildSessions]
         const api = {
             getSessionGroups: vi.fn().mockResolvedValue({
-                groups: [{ id: groupId, projectKey: '/project/a', name: 'Review', createdAt: 1, updatedAt: 1 }],
-                memberships: sessions.slice(4).map((session) => ({
+                groups: [
+                    { id: reviewGroupId, projectKey: '/project/a', name: 'Review', createdAt: 1, updatedAt: 1 },
+                    { id: buildGroupId, projectKey: '/project/a', name: 'Build', createdAt: 2, updatedAt: 2 }
+                ],
+                memberships: sessions.map((session) => ({
                     sessionId: session.id,
-                    groupId,
+                    groupId: session.id.startsWith('review-') ? reviewGroupId : buildGroupId,
                     projectKey: '/project/a',
                     updatedAt: 1
                 }))
@@ -224,20 +234,40 @@ describe('SessionList secondary groups', () => {
             />
         )
 
-        await screen.findByRole('button', { name: /Review/ })
-        expect(document.querySelectorAll('.session-list-item')).toHaveLength(8)
-        expect(screen.getByText('Session 1').closest('[data-session-group-id]')).toBeNull()
-        expect(screen.getByText('Session 5').closest('[data-session-group-id]')).not.toBeNull()
-        expect(screen.queryByText('Session 9')).not.toBeInTheDocument()
-        expect(screen.queryByText('Session 10')).not.toBeInTheDocument()
+        const reviewGroup = (await screen.findByRole('button', { name: 'Review (10)' }))
+            .closest('[data-session-group-id]') as HTMLElement
+        const buildGroup = screen.getByRole('button', { name: 'Build (10)' })
+            .closest('[data-session-group-id]') as HTMLElement
 
-        fireEvent.click(screen.getByRole('button', { name: 'Expand 2' }))
-        await waitFor(() => expect(document.querySelectorAll('.session-list-item')).toHaveLength(10))
-        expect(screen.getByText('Session 9')).toBeInTheDocument()
-        expect(screen.getByText('Session 10')).toBeInTheDocument()
+        expect(reviewGroup).toHaveTextContent('(10)')
+        expect(buildGroup).toHaveTextContent('(10)')
+        expect(reviewGroup.querySelectorAll('.session-list-item')).toHaveLength(8)
+        expect(buildGroup.querySelectorAll('.session-list-item')).toHaveLength(8)
+        expect(screen.queryByText('Review 9')).not.toBeInTheDocument()
+        expect(screen.queryByText('Build 9')).not.toBeInTheDocument()
+
+        const reviewExpand = reviewGroup.querySelector('button[aria-label="Expand 2"]')
+            ?? Array.from(reviewGroup.querySelectorAll('button')).find((button) => button.textContent?.includes('Expand 2'))
+        const buildExpand = Array.from(buildGroup.querySelectorAll('button'))
+            .find((button) => button.textContent?.includes('Expand 2'))
+        expect(reviewExpand).toBeInTheDocument()
+        expect(buildExpand).toBeInTheDocument()
+        expect(screen.getAllByRole('button', { name: 'Expand 2' }).every((button) => (
+            button.closest('[data-session-group-id]') !== null
+        ))).toBe(true)
+
+        fireEvent.click(reviewExpand as HTMLButtonElement)
+        await waitFor(() => expect(reviewGroup.querySelectorAll('.session-list-item')).toHaveLength(10))
+        expect(buildGroup.querySelectorAll('.session-list-item')).toHaveLength(8)
+        expect(screen.getByText('Review 10')).toBeInTheDocument()
+        expect(screen.queryByText('Build 10')).not.toBeInTheDocument()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Collapse 2' }))
+        await waitFor(() => expect(reviewGroup.querySelectorAll('.session-list-item')).toHaveLength(8))
+        expect(buildGroup.querySelectorAll('.session-list-item')).toHaveLength(8)
     })
 
-    it('hides directory preview controls while every named group is collapsed and restores them when expanded', async () => {
+    it('hides a named group preview control while the group is collapsed and restores it on expansion', async () => {
         const groupId = '11111111-1111-4111-8111-111111111111'
         const sessions = Array.from({ length: 10 }, (_, index) => ({
             ...makeSession(`session-${index + 1}`, `Session ${index + 1}`),
@@ -271,18 +301,19 @@ describe('SessionList secondary groups', () => {
 
         const disclosure = await screen.findByRole('button', { name: /Review/ })
         expect(disclosure).toHaveAttribute('aria-expanded', 'false')
+        const namedGroup = disclosure.closest('[data-session-group-id]') as HTMLElement
         expect(screen.queryByRole('button', { name: 'Expand 2' })).not.toBeInTheDocument()
 
         fireEvent.click(disclosure)
         expect(disclosure).toHaveAttribute('aria-expanded', 'true')
-        expect(screen.getByRole('button', { name: 'Expand 2' })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Expand 2' }).closest('[data-session-group-id]')).toBe(namedGroup)
 
         fireEvent.click(disclosure)
         expect(disclosure).toHaveAttribute('aria-expanded', 'false')
         expect(screen.queryByRole('button', { name: 'Expand 2' })).not.toBeInTheDocument()
     })
 
-    it('keeps directory preview controls visible when direct sessions remain outside collapsed named groups', async () => {
+    it('keeps direct sessions outside named pagination and removes the directory-level preview control', async () => {
         const groupId = '11111111-1111-4111-8111-111111111111'
         const sessions = Array.from({ length: 10 }, (_, index) => ({
             ...makeSession(`session-${index + 1}`, `Session ${index + 1}`),
@@ -317,7 +348,45 @@ describe('SessionList secondary groups', () => {
         const disclosure = await screen.findByRole('button', { name: /Review/ })
         expect(disclosure).toHaveAttribute('aria-expanded', 'false')
         expect(screen.getByText('Session 1').closest('[data-session-group-kind="direct"]')).not.toBeNull()
-        expect(screen.getByRole('button', { name: 'Expand 2' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /Expand/ })).not.toBeInTheDocument()
+    })
+
+    it('expands the named group preview cap to reveal a selected session in its natural position', async () => {
+        const groupId = '11111111-1111-4111-8111-111111111111'
+        const sessions = Array.from({ length: 18 }, (_, index) => ({
+            ...makeSession(`session-${index + 1}`, `Session ${index + 1}`),
+            updatedAt: 100 - index
+        }))
+        const api = {
+            getSessionGroups: vi.fn().mockResolvedValue({
+                groups: [{ id: groupId, projectKey: '/project/a', name: 'Review', createdAt: 1, updatedAt: 1 }],
+                memberships: sessions.map((session) => ({
+                    sessionId: session.id,
+                    groupId,
+                    projectKey: '/project/a',
+                    updatedAt: 1
+                }))
+            })
+        } as unknown as ApiClient
+
+        renderWithProviders(
+            <SessionList
+                sessions={sessions}
+                selectedSessionId="session-18"
+                onSelect={vi.fn()}
+                onNewSession={vi.fn()}
+                onRefresh={vi.fn()}
+                isLoading={false}
+                renderHeader={false}
+                api={api}
+            />
+        )
+
+        const namedGroup = (await screen.findByRole('button', { name: 'Review (18)' }))
+            .closest('[data-session-group-id]') as HTMLElement
+        await waitFor(() => expect(namedGroup.querySelectorAll('.session-list-item')).toHaveLength(18))
+        expect(screen.getByText('Session 18').closest('[data-session-group-id]')).toBe(namedGroup)
+        expect(screen.getByRole('button', { name: 'Collapse 8' })).toBeInTheDocument()
     })
 
     it('shows no persistent action icons and keeps a short click dedicated to disclosure', async () => {

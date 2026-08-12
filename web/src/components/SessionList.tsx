@@ -1489,28 +1489,37 @@ export function SessionList(props: {
         })
     }
 
-    // Per-group reveal cap for paginated session previews. Absent = the configured
-    // preview limit; expand/collapse controls move the cap by one preview-sized batch.
-    const [sessionVisibleCounts, setSessionVisibleCounts] = useState<Map<string, number>>(
+    // Each named session group owns its reveal cap. Direct sessions remain at the
+    // directory level and never share pagination with a named group.
+    const [secondarySessionVisibleCounts, setSecondarySessionVisibleCounts] = useState<Map<string, number>>(
         () => new Map()
     )
 
-    const getGroupVisibleCount = (group: SessionGroup): number => {
-        return sessionVisibleCounts.get(group.key) ?? sessionPreviewLimit
+    const getSecondaryGroupVisibleCount = (
+        directoryGroupKey: string,
+        groupId: string
+    ): number => {
+        return secondarySessionVisibleCounts.get(
+            secondaryGroupKey(directoryGroupKey, groupId)
+        ) ?? sessionPreviewLimit
     }
 
-    const showMoreSessions = (group: SessionGroup) => {
-        setSessionVisibleCounts(prev => {
+    const showMoreSecondaryGroupSessions = (
+        directoryGroupKey: string,
+        group: SecondarySessionGroup
+    ) => {
+        setSecondarySessionVisibleCounts(prev => {
             const next = new Map(prev)
+            const key = secondaryGroupKey(directoryGroupKey, group.id)
             const currentLimit = Math.min(
-                prev.get(group.key) ?? sessionPreviewLimit,
+                prev.get(key) ?? sessionPreviewLimit,
                 group.sessions.length
             )
             const currentVisibleCount = getVisibleSessionPreview(group.sessions, {
                 selectedSessionId,
                 limit: currentLimit
             }).length
-            next.set(group.key, getNextSessionVisibleCount(
+            next.set(key, getNextSessionVisibleCount(
                 Math.max(currentLimit, currentVisibleCount),
                 sessionPreviewLimit,
                 group.sessions.length
@@ -1519,49 +1528,29 @@ export function SessionList(props: {
         })
     }
 
-    const showFewerSessions = (group: SessionGroup) => {
-        setSessionVisibleCounts(prev => {
+    const showFewerSecondaryGroupSessions = (
+        directoryGroupKey: string,
+        group: SecondarySessionGroup
+    ) => {
+        setSecondarySessionVisibleCounts(prev => {
             const next = new Map(prev)
+            const key = secondaryGroupKey(directoryGroupKey, group.id)
             const current = Math.min(
-                prev.get(group.key) ?? sessionPreviewLimit,
+                prev.get(key) ?? sessionPreviewLimit,
                 group.sessions.length
             )
             const previous = getPreviousSessionVisibleCount(current, sessionPreviewLimit)
             if (previous <= sessionPreviewLimit) {
-                next.delete(group.key)
+                next.delete(key)
             } else {
-                next.set(group.key, previous)
+                next.set(key, previous)
             }
             return next
         })
     }
 
-    const getVisibleGroupSessions = (group: SessionGroup): SessionSummary[] => {
-        return getVisibleSessionPreview(
-            group.sessions,
-            {
-                selectedSessionId,
-                limit: getGroupVisibleCount(group)
-            }
-        )
-    }
-
     const renderDirectoryGroup = (group: SessionGroup) => {
         const isCollapsed = isGroupCollapsed(group)
-        const visibleGroupSessions = getVisibleGroupSessions(group)
-        const hiddenSessionCount = group.sessions.length - visibleGroupSessions.length
-        const currentLimit = Math.min(
-            getGroupVisibleCount(group),
-            group.sessions.length
-        )
-        const previousLimit = getPreviousSessionVisibleCount(currentLimit, sessionPreviewLimit)
-        const previousGroupSessions = getVisibleSessionPreview(group.sessions, {
-            selectedSessionId,
-            limit: previousLimit
-        })
-        const collapseCount = visibleGroupSessions.length - previousGroupSessions.length
-        const canShowFewerSessions = previousLimit < currentLimit && collapseCount > 0
-        const expandCount = Math.min(sessionPreviewLimit, hiddenSessionCount)
         const canStartInGroupDirectory = group.directory !== 'Other'
         // With multiple machines in the unfiltered view, disambiguate
         // same-named directories by suffixing the machine label.
@@ -1576,22 +1565,9 @@ export function SessionList(props: {
         )
         const visibleUngroupedSessions = getUngroupedSessions(
             group.directory,
-            visibleGroupSessions,
+            group.sessions,
             sessionGroupsQuery.groups,
             sessionGroupsQuery.memberships
-        )
-        const hasExpandedSecondaryGroup = secondaryGroups.some(
-            (secondaryGroup) => !isSecondaryGroupCollapsed(group, secondaryGroup)
-        )
-        const hasVisiblePreviewContent = visibleUngroupedSessions.length > 0
-            || hasExpandedSecondaryGroup
-        const visibleSecondaryGroups = new Map(
-            buildSecondarySessionGroups(
-                group.directory,
-                visibleGroupSessions,
-                sessionGroupsQuery.groups,
-                sessionGroupsQuery.memberships
-            ).map((secondaryGroup) => [secondaryGroup.id, secondaryGroup])
         )
         const customGroupsById = new Map(
             sessionGroupsQuery.groups.map((sessionGroup) => [sessionGroup.id, sessionGroup])
@@ -1677,7 +1653,23 @@ export function SessionList(props: {
                         ) : null}
                         {secondaryGroups.map((secondaryGroup) => {
                             const secondaryCollapsed = isSecondaryGroupCollapsed(group, secondaryGroup)
-                            const visibleSecondarySessions = visibleSecondaryGroups.get(secondaryGroup.id)?.sessions ?? []
+                            const currentLimit = Math.min(
+                                getSecondaryGroupVisibleCount(group.key, secondaryGroup.id),
+                                secondaryGroup.sessions.length
+                            )
+                            const visibleSecondarySessions = getVisibleSessionPreview(
+                                secondaryGroup.sessions,
+                                { selectedSessionId, limit: currentLimit }
+                            )
+                            const hiddenSessionCount = secondaryGroup.sessions.length - visibleSecondarySessions.length
+                            const previousLimit = getPreviousSessionVisibleCount(currentLimit, sessionPreviewLimit)
+                            const previousSecondarySessions = getVisibleSessionPreview(
+                                secondaryGroup.sessions,
+                                { selectedSessionId, limit: previousLimit }
+                            )
+                            const collapseCount = visibleSecondarySessions.length - previousSecondarySessions.length
+                            const canShowFewerSessions = previousLimit < currentLimit && collapseCount > 0
+                            const expandCount = Math.min(sessionPreviewLimit, hiddenSessionCount)
                             const customGroup = secondaryGroup.id
                                 ? customGroupsById.get(secondaryGroup.id) ?? null
                                 : null
@@ -1712,38 +1704,38 @@ export function SessionList(props: {
                                                         />
                                                     </div>
                                                 ))}
+                                                {!secondaryCollapsed
+                                                    && secondaryGroup.sessions.length > sessionPreviewLimit
+                                                    && (hiddenSessionCount > 0 || canShowFewerSessions) ? (
+                                                    <div className="ml-1 mr-1 my-1 flex gap-1.5">
+                                                        {canShowFewerSessions ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => showFewerSecondaryGroupSessions(group.key, secondaryGroup)}
+                                                                className="flex min-w-0 flex-1 items-center justify-center gap-1 rounded-md border border-dashed border-[var(--app-border)] px-2 py-1 text-center text-xs text-[var(--app-hint)] transition-colors hover:bg-[var(--app-subtle-bg)] hover:text-[var(--app-fg)]"
+                                                            >
+                                                                <SessionPreviewArrowIcon direction="up" className="h-3 w-3 shrink-0" />
+                                                                {t('sessions.group.collapse', { n: collapseCount })}
+                                                            </button>
+                                                        ) : null}
+                                                        {hiddenSessionCount > 0 ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => showMoreSecondaryGroupSessions(group.key, secondaryGroup)}
+                                                                className="flex min-w-0 flex-1 items-center justify-center gap-1 rounded-md border border-dashed border-[var(--app-border)] px-2 py-1 text-center text-xs text-[var(--app-hint)] transition-colors hover:bg-[var(--app-subtle-bg)] hover:text-[var(--app-fg)]"
+                                                            >
+                                                                <SessionPreviewArrowIcon direction="down" className="h-3 w-3 shrink-0" />
+                                                                {t('sessions.group.expand', { n: expandCount })}
+                                                            </button>
+                                                        ) : null}
+                                                    </div>
+                                                ) : null}
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             )
                         })}
-                        {hasVisiblePreviewContent
-                            && group.sessions.length > sessionPreviewLimit
-                            && (hiddenSessionCount > 0 || canShowFewerSessions) ? (
-                            <div className="ml-2.5 mr-2 my-1 flex gap-1.5">
-                                {canShowFewerSessions ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => showFewerSessions(group)}
-                                        className="flex min-w-0 flex-1 items-center justify-center gap-1 rounded-md border border-dashed border-[var(--app-border)] px-2 py-1 text-center text-xs text-[var(--app-hint)] transition-colors hover:bg-[var(--app-subtle-bg)] hover:text-[var(--app-fg)]"
-                                    >
-                                        <SessionPreviewArrowIcon direction="up" className="h-3 w-3 shrink-0" />
-                                        {t('sessions.group.collapse', { n: collapseCount })}
-                                    </button>
-                                ) : null}
-                                {hiddenSessionCount > 0 ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => showMoreSessions(group)}
-                                        className="flex min-w-0 flex-1 items-center justify-center gap-1 rounded-md border border-dashed border-[var(--app-border)] px-2 py-1 text-center text-xs text-[var(--app-hint)] transition-colors hover:bg-[var(--app-subtle-bg)] hover:text-[var(--app-fg)]"
-                                    >
-                                        <SessionPreviewArrowIcon direction="down" className="h-3 w-3 shrink-0" />
-                                        {t('sessions.group.expand', { n: expandCount })}
-                                    </button>
-                                ) : null}
-                            </div>
-                        ) : null}
                     </div>
                     </div>
                 </div>
@@ -1826,11 +1818,53 @@ export function SessionList(props: {
         })
     }, [allGroups, sessionGroupsByProject])
 
-    // Clean up reveal caps for groups that no longer exist.
+    // Selecting a session beyond a named group's current preview cap reveals
+    // enough complete batches to keep the selected row in its natural order.
     useEffect(() => {
-        setSessionVisibleCounts(prev => {
+        if (!selectedSessionId) return
+
+        for (const directoryGroup of groups) {
+            const secondaryGroup = buildSecondarySessionGroups(
+                directoryGroup.directory,
+                directoryGroup.sessions,
+                sessionGroupsQuery.groups,
+                sessionGroupsQuery.memberships
+            ).find((candidate) => candidate.sessions.some((session) => session.id === selectedSessionId))
+            if (!secondaryGroup) continue
+
+            const selectedIndex = secondaryGroup.sessions.findIndex((session) => session.id === selectedSessionId)
+            const requiredVisibleCount = Math.min(
+                secondaryGroup.sessions.length,
+                Math.ceil((selectedIndex + 1) / Math.max(1, sessionPreviewLimit)) * Math.max(1, sessionPreviewLimit)
+            )
+            const key = secondaryGroupKey(directoryGroup.key, secondaryGroup.id)
+            setSecondarySessionVisibleCounts((previous) => {
+                const current = previous.get(key) ?? sessionPreviewLimit
+                if (current >= requiredVisibleCount) return previous
+                const next = new Map(previous)
+                next.set(key, requiredVisibleCount)
+                return next
+            })
+            return
+        }
+    }, [
+        selectedSessionId,
+        groups,
+        sessionGroupsQuery.groups,
+        sessionGroupsQuery.memberships,
+        sessionPreviewLimit
+    ])
+
+    // Clean up reveal caps for named groups that no longer exist.
+    useEffect(() => {
+        setSecondarySessionVisibleCounts(prev => {
             if (prev.size === 0) return prev
-            const knownKeys = new Set(allGroups.map(g => g.key))
+            const knownKeys = new Set<string>()
+            for (const group of allGroups) {
+                for (const customGroup of sessionGroupsByProject.get(group.directory) ?? []) {
+                    knownKeys.add(secondaryGroupKey(group.key, customGroup.id))
+                }
+            }
             const next = new Map(prev)
             let changed = false
             for (const key of next.keys()) {
@@ -1841,7 +1875,7 @@ export function SessionList(props: {
             }
             return changed ? next : prev
         })
-    }, [allGroups])
+    }, [allGroups, sessionGroupsByProject])
 
     // The search control unmounts when the list empties; reset the expansion so
     // it cannot suppress header actions (or re-expand on its own when sessions
