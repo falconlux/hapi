@@ -18,6 +18,7 @@ import { delay } from "@/utils/time";
 import { isObject } from "@hapi/protocol";
 import {
     BasePermissionHandler,
+    requiresManualApproval,
     type PendingPermissionRequest,
     type PermissionCompletion
 } from "@/modules/common/permission/BasePermissionHandler";
@@ -289,9 +290,10 @@ export class PermissionHandler extends BasePermissionHandler<PermissionResponse,
      */
     handleToolCall = async (toolName: string, input: unknown, mode: EnhancedMode, options: { signal: AbortSignal }): Promise<PermissionResult> => {
         const isQuestionTool = isQuestionToolName(toolName);
+        const forceManualApproval = requiresManualApproval(toolName);
 
         // Check if tool is explicitly allowed
-        if (!isQuestionTool && toolName === 'Bash') {
+        if (!forceManualApproval && !isQuestionTool && toolName === 'Bash') {
             const inputObj = input as { command?: string };
             if (inputObj?.command) {
                 // Check literal matches
@@ -305,7 +307,7 @@ export class PermissionHandler extends BasePermissionHandler<PermissionResponse,
                     }
                 }
             }
-        } else if (!isQuestionTool && this.allowedTools.has(toolName)) {
+        } else if (!forceManualApproval && !isQuestionTool && this.allowedTools.has(toolName)) {
             return { behavior: 'allow', updatedInput: input as Record<string, unknown> };
         }
 
@@ -316,7 +318,7 @@ export class PermissionHandler extends BasePermissionHandler<PermissionResponse,
         // Handle special cases
         //
 
-        if (!isQuestionTool && this.permissionMode === 'bypassPermissions') {
+        if (!forceManualApproval && !isQuestionTool && this.permissionMode === 'bypassPermissions') {
             // In bypassPermissions (YOLO) mode, exit_plan_mode needs special
             // handling: inject PLAN_FAKE_RESTART so the agent continues after
             // the plan, rather than stalling and waiting for user input.
@@ -328,7 +330,7 @@ export class PermissionHandler extends BasePermissionHandler<PermissionResponse,
             return { behavior: 'allow', updatedInput: input as Record<string, unknown> };
         }
 
-        if (!isQuestionTool && this.permissionMode === 'acceptEdits' && descriptor.edit) {
+        if (!forceManualApproval && !isQuestionTool && this.permissionMode === 'acceptEdits' && descriptor.edit) {
             return { behavior: 'allow', updatedInput: input as Record<string, unknown> };
         }
 

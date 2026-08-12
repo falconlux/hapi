@@ -115,15 +115,40 @@ describe('resolveToolAutoApprovalDecision project groups', () => {
 
     it.each([
         'create_project_group',
+        'mcp__hapi__create_project_group',
+        'hapi_create_project_group',
         'Create Project Group',
         'rename_project_group',
+        'mcp__hapi__rename_project_group',
         'Rename Project Group',
         'delete_project_group',
+        'happy__delete_project_group',
         'Delete Project Group',
         'move_sessions_to_group',
+        'mcp__hapi__move_sessions_to_group',
         'Move Sessions To Group'
-    ])('keeps the write tool %s pending in default and read-only modes', (toolName) => {
-        expect(resolveToolAutoApprovalDecision('default', toolName, 'call-1')).toBeNull()
-        expect(resolveToolAutoApprovalDecision('read-only', toolName, 'call-1')).toBeNull()
+    ])('keeps the write tool %s pending in every permission mode', (toolName) => {
+        for (const mode of [
+            undefined,
+            'default',
+            'read-only',
+            'safe-yolo',
+            'yolo',
+            'always-proceed'
+        ] as const) {
+            expect(resolveToolAutoApprovalDecision(mode, toolName, 'call-1')).toBeNull()
+        }
+    })
+
+    it('does not let rule overrides or a forged auto-approved call id bypass the exact-name gate', () => {
+        expect(resolveToolAutoApprovalDecision(
+            'yolo',
+            'create_project_group',
+            'change_title-forged',
+            {
+                alwaysToolNameHints: ['create_project_group'],
+                alwaysToolIdHints: ['change_title']
+            }
+        )).toBeNull()
     })
 })

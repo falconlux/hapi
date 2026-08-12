@@ -44,6 +44,32 @@ const AUTO_APPROVE_EXACT_TOOL_NAMES = new Set([
     'mcp__hapi__list_project_groups',
     'list project groups'
 ]);
+const MANUAL_APPROVAL_EXACT_TOOL_NAMES = new Set([
+    'create_project_group',
+    'hapi_create_project_group',
+    'happy__create_project_group',
+    'mcp__hapi__create_project_group',
+    'create project group',
+    'rename_project_group',
+    'hapi_rename_project_group',
+    'happy__rename_project_group',
+    'mcp__hapi__rename_project_group',
+    'rename project group',
+    'delete_project_group',
+    'hapi_delete_project_group',
+    'happy__delete_project_group',
+    'mcp__hapi__delete_project_group',
+    'delete project group',
+    'move_sessions_to_group',
+    'hapi_move_sessions_to_group',
+    'happy__move_sessions_to_group',
+    'mcp__hapi__move_sessions_to_group',
+    'move sessions to group'
+]);
+
+export function requiresManualApproval(toolName: string): boolean {
+    return MANUAL_APPROVAL_EXACT_TOOL_NAMES.has(toolName.trim().toLowerCase());
+}
 // ping_peer / inspect_peer intentionally omitted from always-approve: they can
 // resume+inject into another session or read peer histories, so permission
 // modes must still gate them. Treat both as write-like in read-only so ACP
@@ -89,6 +115,12 @@ export function resolveToolAutoApprovalDecision(
     const lowerTool = toolName.toLowerCase();
     const lowerId = toolCallId.toLowerCase();
     const decisionForMode: AutoApprovalDecision = (mode === 'yolo' || mode === 'always-proceed') ? 'approved_for_session' : 'approved';
+
+    // Project organization writes always require an explicit human decision.
+    // This exact-name gate must precede every generic auto-allow mode/override.
+    if (requiresManualApproval(lowerTool)) {
+        return null;
+    }
 
     if (
         AUTO_APPROVE_EXACT_TOOL_NAMES.has(lowerTool)

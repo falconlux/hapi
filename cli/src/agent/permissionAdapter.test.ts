@@ -124,7 +124,7 @@ function createHarnessWithInterceptor(
     };
 }
 
-function createHarnessWithMode(getPermissionMode: () => 'default' | 'read-only' | 'safe-yolo' | 'yolo') {
+function createHarnessWithMode(getPermissionMode: () => 'default' | 'read-only' | 'safe-yolo' | 'yolo' | 'always-proceed') {
     let agentState: FakeAgentState = {
         requests: {},
         completedRequests: {}
@@ -369,6 +369,26 @@ describe('PermissionAdapter', () => {
             }
         });
     });
+
+    it.each(['safe-yolo', 'yolo', 'always-proceed'] as const)(
+        'keeps project group writes pending in %s mode',
+        async (mode) => {
+            const harness = createHarnessWithMode(() => mode);
+
+            harness.emitPermissionRequest(buildRequest({
+                id: `perm-${mode}`,
+                toolCallId: `perm-${mode}`,
+                title: 'Move Sessions To Group',
+                rawInput: { sessionIds: ['session-1'], groupId: null }
+            }));
+            await flushAsyncWork();
+
+            expect(harness.respondCalls).toEqual([]);
+            expect(harness.getAgentState().requests).toMatchObject({
+                [`perm-${mode}`]: { tool: 'Move Sessions To Group' }
+            });
+        }
+    );
 
     it('auto-approves read-only non-write tools but keeps writes pending', async () => {
         const harness = createHarnessWithMode(() => 'read-only');

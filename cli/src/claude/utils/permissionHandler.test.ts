@@ -110,6 +110,69 @@ describe('PermissionHandler — YOLO plan mode', () => {
         expect(queueItems).toHaveLength(0);
     });
 
+    it.each([
+        'mcp__hapi__create_project_group',
+        'mcp__hapi__rename_project_group',
+        'mcp__hapi__delete_project_group',
+        'mcp__hapi__move_sessions_to_group'
+    ])('forces manual approval for %s in bypassPermissions', async (toolName) => {
+        const { session } = createFakeSession();
+        const handler = new PermissionHandler(session);
+        handler.handleModeChange('bypassPermissions');
+
+        handler.onMessage({
+            type: 'assistant',
+            message: {
+                role: 'assistant',
+                content: [{ type: 'tool_use', id: `tc-${toolName}`, name: toolName, input: {} }],
+            },
+        } as any);
+
+        const pending = handler.handleToolCall(
+            toolName,
+            {},
+            { permissionMode: 'bypassPermissions' } as any,
+            { signal: new AbortController().signal }
+        );
+
+        await Promise.resolve();
+        expect(session.client.updateAgentState).toHaveBeenCalledWith(expect.any(Function));
+
+        const permissionRpc = (session.client.rpcHandlerManager.registerHandler as ReturnType<typeof vi.fn>)
+            .mock.calls.find(([method]) => method === 'permission')?.[1] as ((response: unknown) => Promise<unknown>) | undefined;
+        expect(permissionRpc).toBeTypeOf('function');
+        await permissionRpc?.({ id: `tc-${toolName}`, approved: false, reason: 'manual denial' });
+
+        await expect(pending).resolves.toEqual({ behavior: 'deny', message: 'manual denial' });
+    });
+
+    it('does not let a prior allowTools grant bypass manual approval for project group writes', async () => {
+        const { session } = createFakeSession();
+        const handler = new PermissionHandler(session);
+        handler.handleModeChange('default');
+        const toolName = 'mcp__hapi__create_project_group';
+
+        handler.onMessage({
+            type: 'assistant',
+            message: { role: 'assistant', content: [{ type: 'tool_use', id: 'tc-first', name: 'Read', input: {} }] },
+        } as any);
+        const first = handler.handleToolCall('Read', {}, { permissionMode: 'default' } as any, { signal: new AbortController().signal });
+        const permissionRpc = (session.client.rpcHandlerManager.registerHandler as ReturnType<typeof vi.fn>)
+            .mock.calls.find(([method]) => method === 'permission')?.[1] as ((response: unknown) => Promise<unknown>) | undefined;
+        await permissionRpc?.({ id: 'tc-first', approved: true, allowTools: [toolName] });
+        await expect(first).resolves.toMatchObject({ behavior: 'allow' });
+
+        handler.handleModeChange('bypassPermissions');
+        handler.onMessage({
+            type: 'assistant',
+            message: { role: 'assistant', content: [{ type: 'tool_use', id: 'tc-write', name: toolName, input: {} }] },
+        } as any);
+        const write = handler.handleToolCall(toolName, {}, { permissionMode: 'bypassPermissions' } as any, { signal: new AbortController().signal });
+        await Promise.resolve();
+        await permissionRpc?.({ id: 'tc-write', approved: false, reason: 'still manual' });
+        await expect(write).resolves.toEqual({ behavior: 'deny', message: 'still manual' });
+    });
+
     // Regression: turn-in-progress switch from default to bypassPermissions via
     // SetSessionConfig RPC updates session.setPermissionMode but doesn't go
     // through handler.handleModeChange. The next canCallTool must reflect the
