@@ -1580,6 +1580,11 @@ export function SessionList(props: {
             sessionGroupsQuery.groups,
             sessionGroupsQuery.memberships
         )
+        const hasExpandedSecondaryGroup = secondaryGroups.some(
+            (secondaryGroup) => !isSecondaryGroupCollapsed(group, secondaryGroup)
+        )
+        const hasVisiblePreviewContent = visibleUngroupedSessions.length > 0
+            || hasExpandedSecondaryGroup
         const visibleSecondaryGroups = new Map(
             buildSecondarySessionGroups(
                 group.directory,
@@ -1713,7 +1718,9 @@ export function SessionList(props: {
                                 </div>
                             )
                         })}
-                        {group.sessions.length > sessionPreviewLimit && (hiddenSessionCount > 0 || canShowFewerSessions) ? (
+                        {hasVisiblePreviewContent
+                            && group.sessions.length > sessionPreviewLimit
+                            && (hiddenSessionCount > 0 || canShowFewerSessions) ? (
                             <div className="ml-2.5 mr-2 my-1 flex gap-1.5">
                                 {canShowFewerSessions ? (
                                     <button

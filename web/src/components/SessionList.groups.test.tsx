@@ -237,6 +237,89 @@ describe('SessionList secondary groups', () => {
         expect(screen.getByText('Session 10')).toBeInTheDocument()
     })
 
+    it('hides directory preview controls while every named group is collapsed and restores them when expanded', async () => {
+        const groupId = '11111111-1111-4111-8111-111111111111'
+        const sessions = Array.from({ length: 10 }, (_, index) => ({
+            ...makeSession(`session-${index + 1}`, `Session ${index + 1}`),
+            active: false,
+            updatedAt: 100 - index
+        }))
+        const api = {
+            getSessionGroups: vi.fn().mockResolvedValue({
+                groups: [{ id: groupId, projectKey: '/project/a', name: 'Review', createdAt: 1, updatedAt: 1 }],
+                memberships: sessions.map((session) => ({
+                    sessionId: session.id,
+                    groupId,
+                    projectKey: '/project/a',
+                    updatedAt: 1
+                }))
+            })
+        } as unknown as ApiClient
+
+        renderWithProviders(
+            <SessionList
+                sessions={sessions}
+                selectedSessionId={null}
+                onSelect={vi.fn()}
+                onNewSession={vi.fn()}
+                onRefresh={vi.fn()}
+                isLoading={false}
+                renderHeader={false}
+                api={api}
+            />
+        )
+
+        const disclosure = await screen.findByRole('button', { name: /Review/ })
+        expect(disclosure).toHaveAttribute('aria-expanded', 'false')
+        expect(screen.queryByRole('button', { name: 'Expand 2' })).not.toBeInTheDocument()
+
+        fireEvent.click(disclosure)
+        expect(disclosure).toHaveAttribute('aria-expanded', 'true')
+        expect(screen.getByRole('button', { name: 'Expand 2' })).toBeInTheDocument()
+
+        fireEvent.click(disclosure)
+        expect(disclosure).toHaveAttribute('aria-expanded', 'false')
+        expect(screen.queryByRole('button', { name: 'Expand 2' })).not.toBeInTheDocument()
+    })
+
+    it('keeps directory preview controls visible when direct sessions remain outside collapsed named groups', async () => {
+        const groupId = '11111111-1111-4111-8111-111111111111'
+        const sessions = Array.from({ length: 10 }, (_, index) => ({
+            ...makeSession(`session-${index + 1}`, `Session ${index + 1}`),
+            active: false,
+            updatedAt: 100 - index
+        }))
+        const api = {
+            getSessionGroups: vi.fn().mockResolvedValue({
+                groups: [{ id: groupId, projectKey: '/project/a', name: 'Review', createdAt: 1, updatedAt: 1 }],
+                memberships: sessions.slice(1).map((session) => ({
+                    sessionId: session.id,
+                    groupId,
+                    projectKey: '/project/a',
+                    updatedAt: 1
+                }))
+            })
+        } as unknown as ApiClient
+
+        renderWithProviders(
+            <SessionList
+                sessions={sessions}
+                selectedSessionId={null}
+                onSelect={vi.fn()}
+                onNewSession={vi.fn()}
+                onRefresh={vi.fn()}
+                isLoading={false}
+                renderHeader={false}
+                api={api}
+            />
+        )
+
+        const disclosure = await screen.findByRole('button', { name: /Review/ })
+        expect(disclosure).toHaveAttribute('aria-expanded', 'false')
+        expect(screen.getByText('Session 1').closest('[data-session-group-kind="direct"]')).not.toBeNull()
+        expect(screen.getByRole('button', { name: 'Expand 2' })).toBeInTheDocument()
+    })
+
     it('shows no persistent action icons and keeps a short click dedicated to disclosure', async () => {
         renderGroupedList()
 
