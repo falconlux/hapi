@@ -178,4 +178,27 @@ describe('runHappyMcpStdioBridge tool forwarding', () => {
         })
     })
 
+    it('registers and forwards every project group tool when included in --tools', async () => {
+        const toolNames = [
+            'list_project_groups',
+            'create_project_group',
+            'rename_project_group',
+            'delete_project_group',
+            'move_sessions_to_group'
+        ]
+        await runHappyMcpStdioBridge([
+            '--url',
+            'http://127.0.0.1:43006',
+            '--tools',
+            toolNames.join(',')
+        ])
+
+        expect([...harness.tools.keys()]).toEqual(toolNames)
+        await harness.tools.get('move_sessions_to_group')?.({ sessionIds: ['session-1'], groupId: null })
+        expect(harness.callTool).toHaveBeenCalledWith({
+            name: 'move_sessions_to_group',
+            arguments: { sessionIds: ['session-1'], groupId: null }
+        })
+    })
+
 })

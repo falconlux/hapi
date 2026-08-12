@@ -22,8 +22,9 @@ import {
   PING_PEER_TOOL_DESCRIPTION,
   SESSION_ID_PREFIX_PARAM_DESCRIPTION,
 } from '@hapi/protocol/sessionCitation';
+import { projectGroupToolDefinitions, PROJECT_GROUP_TOOL_NAMES } from '@/modules/projectGroups/mcpDefinitions';
 
-const DEFAULT_TOOL_NAMES = ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer'];
+const DEFAULT_TOOL_NAMES = ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer', ...PROJECT_GROUP_TOOL_NAMES];
 
 function parseArgs(argv: string[]): { url: string | null; toolNames: Set<string> } {
   let url: string | null = null;
@@ -317,6 +318,25 @@ export async function runHappyMcpStdioBridge(argv: string[]): Promise<void> {
           } catch (error) {
             return {
               content: [{ type: 'text' as const, text: `Failed to create peer: ${error instanceof Error ? error.message : String(error)}` }],
+              isError: true,
+            };
+          }
+        }
+      );
+    }
+
+    for (const toolName of PROJECT_GROUP_TOOL_NAMES) {
+      if (!toolNames.has(toolName)) continue;
+      server.registerTool<any, any>(
+        toolName,
+        projectGroupToolDefinitions[toolName],
+        async (args: Record<string, unknown>) => {
+          try {
+            const client = await ensureHttpClient();
+            return await client.callTool({ name: toolName, arguments: args }) as any;
+          } catch (error) {
+            return {
+              content: [{ type: 'text' as const, text: `Failed to call ${toolName}: ${error instanceof Error ? error.message : String(error)}` }],
               isError: true,
             };
           }

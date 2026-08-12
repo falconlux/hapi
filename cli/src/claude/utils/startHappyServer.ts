@@ -27,6 +27,14 @@ import {
     SESSION_ID_PREFIX_PARAM_DESCRIPTION,
 } from '@hapi/protocol/sessionCitation'
 import { PingPeerError, createPeerAgentSession, formatInspectPeerReport, formatPeerSessionsList, inspectPeer, listPeerSessions, peerListFetchLimit, pingPeer } from "@/modules/pingPeer/pingPeer";
+import {
+    createProjectGroup,
+    deleteProjectGroup,
+    listProjectGroups,
+    moveSessionsToProjectGroup,
+    renameProjectGroup
+} from '@/modules/projectGroups/projectGroups';
+import { projectGroupToolDefinitions, PROJECT_GROUP_TOOL_NAMES } from '@/modules/projectGroups/mcpDefinitions';
 
 type StartHappyServerOptions = {
     emitTitleSummary?: boolean;
@@ -43,7 +51,11 @@ const CLAUDE_MANUAL_APPROVAL_HAPI_TOOLS = new Set([
     'display_video',
     'create_peer',
     'ping_peer',
-    'inspect_peer'
+    'inspect_peer',
+    'create_project_group',
+    'rename_project_group',
+    'delete_project_group',
+    'move_sessions_to_group'
 ]);
 
 /**
@@ -470,6 +482,61 @@ function createHapiMcpServer(
         }
     });
 
+    mcp.registerTool<any, any>('list_project_groups', projectGroupToolDefinitions.list_project_groups, async (args: { projectKey?: string }) => {
+        try {
+            const result = await listProjectGroups(args);
+            return {
+                content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+                structuredContent: result,
+                isError: false,
+            };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { content: [{ type: 'text' as const, text: `Failed to list project groups: ${message}` }], isError: true };
+        }
+    });
+
+    mcp.registerTool<any, any>('create_project_group', projectGroupToolDefinitions.create_project_group, async (args: { projectKey: string; name: string }) => {
+        try {
+            const group = await createProjectGroup(args);
+            return { content: [{ type: 'text' as const, text: `Created project group ${group.name} (${group.id})` }], structuredContent: { group }, isError: false };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { content: [{ type: 'text' as const, text: `Failed to create project group: ${message}` }], isError: true };
+        }
+    });
+
+    mcp.registerTool<any, any>('rename_project_group', projectGroupToolDefinitions.rename_project_group, async (args: { groupId: string; name: string }) => {
+        try {
+            const group = await renameProjectGroup(args);
+            return { content: [{ type: 'text' as const, text: `Renamed project group to ${group.name} (${group.id})` }], structuredContent: { group }, isError: false };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { content: [{ type: 'text' as const, text: `Failed to rename project group: ${message}` }], isError: true };
+        }
+    });
+
+    mcp.registerTool<any, any>('delete_project_group', projectGroupToolDefinitions.delete_project_group, async (args: { groupId: string }) => {
+        try {
+            await deleteProjectGroup(args);
+            return { content: [{ type: 'text' as const, text: `Deleted project group ${args.groupId}. Sessions were not deleted and are now unassigned.` }], isError: false };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { content: [{ type: 'text' as const, text: `Failed to delete project group: ${message}` }], isError: true };
+        }
+    });
+
+    mcp.registerTool<any, any>('move_sessions_to_group', projectGroupToolDefinitions.move_sessions_to_group, async (args: { sessionIds: string[]; groupId: string | null }) => {
+        try {
+            await moveSessionsToProjectGroup(args);
+            const destination = args.groupId ?? 'unassigned';
+            return { content: [{ type: 'text' as const, text: `Moved ${args.sessionIds.length} session(s) to ${destination}` }], isError: false };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { content: [{ type: 'text' as const, text: `Failed to move sessions: ${message}` }], isError: true };
+        }
+    });
+
 
     if (skillLookup) {
         mcp.registerTool<any, any>('skill_lookup', {
@@ -593,6 +660,7 @@ export async function startHappyServer(client: ApiSessionClient, options: StartH
     const toolNames = enableChangeTitle
         ? ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer']
         : ['display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer'];
+    toolNames.push(...PROJECT_GROUP_TOOL_NAMES);
     if (options.skillLookup) {
         toolNames.push('skill_lookup');
     }

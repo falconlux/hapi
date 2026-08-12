@@ -101,3 +101,29 @@ describe('resolveToolAutoApprovalDecision list_peers', () => {
         )).toBeNull()
     })
 })
+
+describe('resolveToolAutoApprovalDecision project groups', () => {
+    it.each([
+        'list_project_groups',
+        'hapi_list_project_groups',
+        'happy__list_project_groups',
+        'mcp__hapi__list_project_groups',
+        'List Project Groups'
+    ])('auto-approves the exact read-only tool %s', (toolName) => {
+        expect(resolveToolAutoApprovalDecision('default', toolName, 'call-1')).toBe('approved')
+    })
+
+    it.each([
+        'create_project_group',
+        'Create Project Group',
+        'rename_project_group',
+        'Rename Project Group',
+        'delete_project_group',
+        'Delete Project Group',
+        'move_sessions_to_group',
+        'Move Sessions To Group'
+    ])('keeps the write tool %s pending in default and read-only modes', (toolName) => {
+        expect(resolveToolAutoApprovalDecision('default', toolName, 'call-1')).toBeNull()
+        expect(resolveToolAutoApprovalDecision('read-only', toolName, 'call-1')).toBeNull()
+    })
+})

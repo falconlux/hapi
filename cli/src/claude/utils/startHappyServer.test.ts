@@ -115,7 +115,12 @@ describe('startHappyServer skill_lookup', () => {
             'ping_peer',
             'inspect_peer',
             'list_peers',
-            'create_peer'
+            'create_peer',
+            'list_project_groups',
+            'create_project_group',
+            'rename_project_group',
+            'delete_project_group',
+            'move_sessions_to_group',
         ])
     })
 
@@ -153,7 +158,7 @@ describe('startHappyServer skill_lookup', () => {
         await mcp.connect(new StreamableHTTPClientTransport(new URL(server.url)))
         const tools = await mcp.listTools()
 
-        expect(server.toolNames).toEqual(['display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer'])
+        expect(server.toolNames).toEqual(['display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer', 'list_project_groups', 'create_project_group', 'rename_project_group', 'delete_project_group', 'move_sessions_to_group'])
         expect(tools.tools.map((tool) => tool.name)).toEqual([
             'display_image',
             'display_video',
@@ -161,7 +166,12 @@ describe('startHappyServer skill_lookup', () => {
             'ping_peer',
             'inspect_peer',
             'list_peers',
-            'create_peer'
+            'create_peer',
+            'list_project_groups',
+            'create_project_group',
+            'rename_project_group',
+            'delete_project_group',
+            'move_sessions_to_group',
         ])
     })
 
@@ -178,11 +188,17 @@ describe('toClaudeAllowedHapiMcpTools', () => {
             'create_peer',
             'ping_peer',
             'inspect_peer',
+            'list_project_groups',
+            'create_project_group',
+            'rename_project_group',
+            'delete_project_group',
+            'move_sessions_to_group',
             'skill_lookup'
         ])).toEqual([
             'mcp__hapi__change_title',
             'mcp__hapi__display_image',
             'mcp__hapi__list_peers',
+            'mcp__hapi__list_project_groups',
             'mcp__hapi__skill_lookup'
         ])
         expect(toClaudeAllowedHapiMcpTools(['display_video'])).not.toContain('mcp__hapi__display_video')

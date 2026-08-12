@@ -109,9 +109,20 @@ export async function buildHapiMcpBridge(
     tools.list_peers = {
         approval_mode: 'approve'
     };
+    tools.list_project_groups = {
+        approval_mode: 'approve'
+    };
     tools.create_peer = {
         approval_mode: 'prompt'
     };
+    for (const toolName of [
+        'create_project_group',
+        'rename_project_group',
+        'delete_project_group',
+        'move_sessions_to_group'
+    ]) {
+        tools[toolName] = { approval_mode: 'prompt' };
+    }
     // ping_peer / inspect_peer are registered on the HTTP MCP server / stdio
     // bridge, but are not auto-approved: they target another session (resume +
     // inject, or read peer histories).
