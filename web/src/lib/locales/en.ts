@@ -89,6 +89,7 @@ export default {
   'session.group.create': 'New group',
   'session.group.rename': 'Rename group',
   'session.group.delete': 'Delete group',
+  'session.group.actions': 'Group actions',
   'session.group.createTitle': 'Create session group',
   'session.group.renameTitle': 'Rename session group',
   'session.group.deleteTitle': 'Delete session group',

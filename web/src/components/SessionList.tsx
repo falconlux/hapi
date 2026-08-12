@@ -10,6 +10,7 @@ import { RenameSessionDialog } from '@/components/RenameSessionDialog'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { MoveSessionGroupDialog } from '@/components/MoveSessionGroupDialog'
 import { SessionGroupNameDialog } from '@/components/SessionGroupNameDialog'
+import { SessionGroupActionMenu } from '@/components/SessionGroupActionMenu'
 import { CopyIcon, CheckIcon } from '@/components/icons'
 
 function PinnedSectionIcon(props: { className?: string }) {
@@ -56,7 +57,7 @@ import { transferComposerDraftThenNavigate } from '@/lib/composer-draft-transfer
 import { useToast } from '@/lib/toast-context'
 import { useSessionGroups } from '@/hooks/queries/useSessionGroups'
 import { useSessionGroupActions } from '@/hooks/mutations/useSessionGroupActions'
-import { buildSecondarySessionGroups, getSessionProjectKey, type SecondarySessionGroup } from '@/lib/session-groups'
+import { buildSecondarySessionGroups, getSessionProjectKey, getUngroupedSessions, type SecondarySessionGroup } from '@/lib/session-groups'
 
 export { getWorktreeSessionLabel } from '@/lib/sessionWorktreeLabel'
 
@@ -499,6 +500,78 @@ function ChevronIcon(props: { className?: string; collapsed?: boolean }) {
         >
             <polyline points="9 18 15 12 9 6" />
         </svg>
+    )
+}
+
+function SecondaryGroupHeader(props: {
+    directoryGroupKey: string
+    secondaryGroup: SecondarySessionGroup
+    customGroup: CustomSessionGroup | null
+    collapsed: boolean
+    onToggle: (directoryGroupKey: string, groupId: string, collapsed: boolean) => void
+    onOpenActions: (group: CustomSessionGroup, point: { x: number; y: number }) => void
+}) {
+    const { t } = useTranslation()
+    const longPressHandlers = useLongPress({
+        interaction: 'touch-only-native-click',
+        threshold: 500,
+        longPressEnabled: props.customGroup !== null,
+        contextMenuEnabled: props.customGroup !== null,
+        onClick: () => props.onToggle(
+            props.directoryGroupKey,
+            props.secondaryGroup.id,
+            props.collapsed
+        ),
+        onLongPress: (point) => {
+            if (props.customGroup) props.onOpenActions(props.customGroup, point)
+        }
+    })
+
+    const handleKeyDown: React.KeyboardEventHandler<HTMLButtonElement> = (event) => {
+        const opensContextMenu = event.key === 'ContextMenu'
+            || (event.shiftKey && event.key === 'F10')
+        if (opensContextMenu && props.customGroup) {
+            event.preventDefault()
+            event.stopPropagation()
+            const rect = event.currentTarget.getBoundingClientRect()
+            props.onOpenActions(props.customGroup, {
+                x: rect.left + rect.width / 2,
+                y: rect.bottom
+            })
+            return
+        }
+        longPressHandlers.onKeyDown(event)
+    }
+
+    return (
+        <div className="flex min-w-0 w-full select-none items-center rounded-md px-1.5 py-1 text-[var(--app-hint)] transition-colors hover:bg-[var(--app-subtle-bg)]">
+            <button
+                type="button"
+                {...longPressHandlers}
+                onKeyDown={handleKeyDown}
+                className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)]"
+                style={{ WebkitTouchCallout: 'none' }}
+                aria-expanded={!props.collapsed}
+                aria-haspopup={props.customGroup ? 'menu' : undefined}
+            >
+                <ChevronIcon className="h-3 w-3 shrink-0" collapsed={props.collapsed} />
+                <SessionGroupIcon className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--app-fg)]">
+                    {props.secondaryGroup.name}
+                </span>
+                {props.secondaryGroup.thinkingCount > 0 ? (
+                    <span className="shrink-0 text-[10px] text-[var(--app-badge-success-text)]">
+                        {t('session.group.thinkingCount', { n: props.secondaryGroup.thinkingCount })}
+                    </span>
+                ) : null}
+                {props.secondaryGroup.pendingCount > 0 ? (
+                    <span className="shrink-0 text-[10px] text-[var(--app-badge-warning-text)]">
+                        {t('session.group.pendingCount', { n: props.secondaryGroup.pendingCount })}
+                    </span>
+                ) : null}
+                <span className="shrink-0 text-[10px] tabular-nums">({props.secondaryGroup.count})</span>
+            </button>
+        </div>
     )
 }
 
@@ -1180,6 +1253,10 @@ export function SessionList(props: {
     const [createGroupProjectKey, setCreateGroupProjectKey] = useState<string | null>(null)
     const [renameGroup, setRenameGroup] = useState<CustomSessionGroup | null>(null)
     const [deleteGroup, setDeleteGroup] = useState<CustomSessionGroup | null>(null)
+    const [groupActionMenu, setGroupActionMenu] = useState<{
+        group: CustomSessionGroup
+        anchorPoint: { x: number; y: number }
+    } | null>(null)
     const showDetailedStatus = sessionListStatusMode === 'detailed'
     const [searchQuery, setSearchQuery] = useState('')
     const [searchExpanded, setSearchExpanded] = useState(false)
@@ -1389,8 +1466,8 @@ export function SessionList(props: {
         })
     }
 
-    const secondaryGroupKey = (directoryGroupKey: string, groupId: string | null) => (
-        `secondary::${directoryGroupKey}::${groupId ?? 'ungrouped'}`
+    const secondaryGroupKey = (directoryGroupKey: string, groupId: string) => (
+        `secondary::${directoryGroupKey}::${groupId}`
     )
 
     const isSecondaryGroupCollapsed = (directoryGroup: SessionGroup, group: SecondarySessionGroup): boolean => {
@@ -1404,7 +1481,7 @@ export function SessionList(props: {
         return !group.hasActiveSession && !group.hasPinnedSession && !hasSelectedSession
     }
 
-    const toggleSecondaryGroup = (directoryGroupKey: string, groupId: string | null, isCollapsed: boolean) => {
+    const toggleSecondaryGroup = (directoryGroupKey: string, groupId: string, isCollapsed: boolean) => {
         setSecondaryCollapseOverrides((previous) => {
             const next = new Map(previous)
             next.set(secondaryGroupKey(directoryGroupKey, groupId), !isCollapsed)
@@ -1495,16 +1572,20 @@ export function SessionList(props: {
             group.directory,
             group.sessions,
             sessionGroupsQuery.groups,
-            sessionGroupsQuery.memberships,
-            t('session.group.ungrouped')
+            sessionGroupsQuery.memberships
+        )
+        const visibleUngroupedSessions = getUngroupedSessions(
+            group.directory,
+            visibleGroupSessions,
+            sessionGroupsQuery.groups,
+            sessionGroupsQuery.memberships
         )
         const visibleSecondaryGroups = new Map(
             buildSecondarySessionGroups(
                 group.directory,
                 visibleGroupSessions,
                 sessionGroupsQuery.groups,
-                sessionGroupsQuery.memberships,
-                t('session.group.ungrouped')
+                sessionGroupsQuery.memberships
             ).map((secondaryGroup) => [secondaryGroup.id, secondaryGroup])
         )
         const customGroupsById = new Map(
@@ -1569,6 +1650,26 @@ export function SessionList(props: {
                 <div className="collapsible-panel" data-open={!isCollapsed || undefined}>
                     <div className="collapsible-inner">
                     <div className="flex flex-col gap-0.5 ml-3 pl-1 py-1">
+                        {visibleUngroupedSessions.length > 0 ? (
+                            <div data-session-group-kind="direct" className="flex flex-col gap-0.5">
+                                {visibleUngroupedSessions.map((session, index) => (
+                                    <div key={session.id} className="contents">
+                                        {shouldShowPinnedDivider(visibleUngroupedSessions, index) ? (
+                                            <div className="ml-2.5 mr-2 my-1 border-t border-[var(--app-border)]" aria-hidden="true" />
+                                        ) : null}
+                                        <SessionItem
+                                            session={session}
+                                            onSelect={props.onSelect}
+                                            showPath={false}
+                                            api={api}
+                                            selected={session.id === selectedSessionId}
+                                            showDetailedStatus={showDetailedStatus}
+                                            {...getSessionGroupingProps(session)}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
                         {secondaryGroups.map((secondaryGroup) => {
                             const secondaryCollapsed = isSecondaryGroupCollapsed(group, secondaryGroup)
                             const visibleSecondarySessions = visibleSecondaryGroups.get(secondaryGroup.id)?.sessions ?? []
@@ -1576,54 +1677,17 @@ export function SessionList(props: {
                                 ? customGroupsById.get(secondaryGroup.id) ?? null
                                 : null
                             return (
-                                <div key={secondaryGroup.id ?? 'ungrouped'}>
-                                    <div className="group/subgroup flex min-w-0 w-full select-none items-center gap-1 rounded-md px-1.5 py-1 text-[var(--app-hint)] transition-colors hover:bg-[var(--app-subtle-bg)]">
-                                        <button
-                                            type="button"
-                                            className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-link)]"
-                                            aria-expanded={!secondaryCollapsed}
-                                            onClick={() => toggleSecondaryGroup(group.key, secondaryGroup.id, secondaryCollapsed)}
-                                        >
-                                            <ChevronIcon className="h-3 w-3 shrink-0" collapsed={secondaryCollapsed} />
-                                            <SessionGroupIcon className="h-3.5 w-3.5 shrink-0" />
-                                            <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--app-fg)]">
-                                                {secondaryGroup.name}
-                                            </span>
-                                            {secondaryGroup.thinkingCount > 0 ? (
-                                                <span className="shrink-0 text-[10px] text-[var(--app-badge-success-text)]">
-                                                    {t('session.group.thinkingCount', { n: secondaryGroup.thinkingCount })}
-                                                </span>
-                                            ) : null}
-                                            {secondaryGroup.pendingCount > 0 ? (
-                                                <span className="shrink-0 text-[10px] text-[var(--app-badge-warning-text)]">
-                                                    {t('session.group.pendingCount', { n: secondaryGroup.pendingCount })}
-                                                </span>
-                                            ) : null}
-                                            <span className="shrink-0 text-[10px] tabular-nums">({secondaryGroup.count})</span>
-                                        </button>
-                                        {customGroup ? (
-                                            <>
-                                                <button
-                                                    type="button"
-                                                    className="rounded p-1 opacity-100 transition-opacity hover:bg-[var(--app-secondary-bg)] sm:opacity-0 sm:group-hover/subgroup:opacity-100 focus:opacity-100"
-                                                    title={t('session.group.rename')}
-                                                    aria-label={t('session.group.rename')}
-                                                    onClick={() => setRenameGroup(customGroup)}
-                                                >
-                                                    <span aria-hidden="true">✎</span>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="rounded p-1 text-red-500 opacity-100 transition-opacity hover:bg-red-500/10 sm:opacity-0 sm:group-hover/subgroup:opacity-100 focus:opacity-100"
-                                                    title={t('session.group.delete')}
-                                                    aria-label={t('session.group.delete')}
-                                                    onClick={() => setDeleteGroup(customGroup)}
-                                                >
-                                                    <span aria-hidden="true">×</span>
-                                                </button>
-                                            </>
-                                        ) : null}
-                                    </div>
+                                <div key={secondaryGroup.id} data-session-group-id={secondaryGroup.id}>
+                                    <SecondaryGroupHeader
+                                        directoryGroupKey={group.key}
+                                        secondaryGroup={secondaryGroup}
+                                        customGroup={customGroup}
+                                        collapsed={secondaryCollapsed}
+                                        onToggle={toggleSecondaryGroup}
+                                        onOpenActions={(selectedGroup, anchorPoint) => {
+                                            setGroupActionMenu({ group: selectedGroup, anchorPoint })
+                                        }}
+                                    />
                                     <div className="collapsible-panel" data-open={!secondaryCollapsed || undefined}>
                                         <div className="collapsible-inner">
                                             <div className="ml-3 flex flex-col gap-0.5 border-l border-[var(--app-divider)] pl-1 py-0.5">
@@ -1739,7 +1803,6 @@ export function SessionList(props: {
             if (previous.size === 0) return previous
             const knownKeys = new Set<string>()
             for (const group of allGroups) {
-                knownKeys.add(secondaryGroupKey(group.key, null))
                 for (const customGroup of sessionGroupsByProject.get(group.directory) ?? []) {
                     knownKeys.add(secondaryGroupKey(group.key, customGroup.id))
                 }
@@ -2123,6 +2186,15 @@ export function SessionList(props: {
                         await sessionGroupActions.createGroup(createGroupProjectKey, name)
                     }}
                     isPending={sessionGroupActions.isPending}
+                />
+            ) : null}
+            {groupActionMenu ? (
+                <SessionGroupActionMenu
+                    isOpen={true}
+                    anchorPoint={groupActionMenu.anchorPoint}
+                    onClose={() => setGroupActionMenu(null)}
+                    onRename={() => setRenameGroup(groupActionMenu.group)}
+                    onDelete={() => setDeleteGroup(groupActionMenu.group)}
                 />
             ) : null}
             {renameGroup ? (

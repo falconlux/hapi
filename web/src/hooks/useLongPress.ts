@@ -15,6 +15,8 @@ type UseLongPressOptions = {
     interaction?: 'legacy' | 'touch-only-native-click'
     /** Disable just the long-press gesture while retaining the normal click. */
     longPressEnabled?: boolean
+    /** In native-button mode, route desktop right-click to onLongPress. */
+    contextMenuEnabled?: boolean
 }
 
 // How long after a touch interaction to keep ignoring synthesized mouse
@@ -49,6 +51,7 @@ export function useLongPress(options: UseLongPressOptions): UseLongPressHandlers
         disabled = false,
         interaction = 'legacy',
         longPressEnabled = true,
+        contextMenuEnabled = false,
     } = options
 
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -67,6 +70,7 @@ export function useLongPress(options: UseLongPressOptions): UseLongPressHandlers
     // time — on a persistent list (tablet sidebar) the second click lands on
     // whatever row slid under the finger, navigating to the wrong session.
     const lastTouchAtRef = useRef(0)
+    const nativeTouchActiveRef = useRef(false)
 
     const clearTimer = useCallback(() => {
         if (timerRef.current) {
@@ -191,6 +195,7 @@ export function useLongPress(options: UseLongPressOptions): UseLongPressHandlers
     const onNativeTouchStart = useCallback<React.TouchEventHandler>((e) => {
         const touch = e.touches[0]
         if (!touch) return
+        nativeTouchActiveRef.current = true
         // A new physical touch starts a new native click sequence. If a prior
         // long touch did not yield a browser click at all, do not suppress this
         // later genuine activation.
@@ -203,6 +208,7 @@ export function useLongPress(options: UseLongPressOptions): UseLongPressHandlers
         if (isLongPressRef.current) {
             armNativeClickSuppression()
         }
+        nativeTouchActiveRef.current = false
         isLongPressRef.current = false
         touchMoved.current = false
     }, [armNativeClickSuppression, clearTimer])
@@ -218,8 +224,33 @@ export function useLongPress(options: UseLongPressOptions): UseLongPressHandlers
         // stays completely native and never becomes a queue gesture.
         if (isLongPressRef.current || suppressNextNativeClickRef.current) {
             e.preventDefault()
+            return
         }
-    }, [])
+        if (nativeTouchActiveRef.current && touchMoved.current) {
+            e.preventDefault()
+            clearTimer()
+            return
+        }
+        if (!disabled && contextMenuEnabled) {
+            e.preventDefault()
+            clearTimer()
+            if (nativeTouchActiveRef.current) {
+                // Some touch browsers dispatch contextmenu before our 500ms
+                // timer. Mark the gesture as handled so touchend suppresses
+                // the compatibility click instead of folding the button.
+                isLongPressRef.current = true
+            }
+            onLongPress({ x: e.clientX, y: e.clientY })
+        }
+    }, [clearTimer, contextMenuEnabled, disabled, onLongPress])
+
+    const onNativeTouchCancel = useCallback<React.TouchEventHandler>(() => {
+        nativeTouchActiveRef.current = false
+        clearTimer()
+        isLongPressRef.current = false
+        touchMoved.current = false
+        clearNativeClickSuppression()
+    }, [clearNativeClickSuppression, clearTimer])
 
     const onNativeClick = useCallback<React.MouseEventHandler>((e) => {
         if (disabled) return
@@ -245,7 +276,7 @@ export function useLongPress(options: UseLongPressOptions): UseLongPressHandlers
             onTouchStart: onNativeTouchStart,
             onTouchEnd: onNativeTouchEnd,
             onTouchMove: onNativeTouchMove,
-            onTouchCancel,
+            onTouchCancel: onNativeTouchCancel,
             onContextMenu: onNativeContextMenu,
             onKeyDown: () => {},
             onClick: onNativeClick,

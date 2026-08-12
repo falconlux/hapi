@@ -1,7 +1,7 @@
 import type { SessionGroup, SessionGroupMembership, SessionSummary } from '@/types/api'
 
 export type SecondarySessionGroup = {
-    id: string | null
+    id: string
     name: string
     sessions: SessionSummary[]
     count: number
@@ -20,8 +20,7 @@ export function buildSecondarySessionGroups(
     projectKey: string,
     sessions: SessionSummary[],
     groups: SessionGroup[],
-    memberships: SessionGroupMembership[],
-    ungroupedName: string
+    memberships: SessionGroupMembership[]
 ): SecondarySessionGroup[] {
     const projectGroups = groups
         .filter((group) => group.projectKey === projectKey)
@@ -36,20 +35,15 @@ export function buildSecondarySessionGroups(
             .map((membership) => [membership.sessionId, membership.groupId])
     )
     const sessionsByGroup = new Map<string, SessionSummary[]>()
-    const ungrouped: SessionSummary[] = []
-
     for (const session of sessions) {
         const groupId = membershipBySession.get(session.id)
-        if (!groupId) {
-            ungrouped.push(session)
-            continue
-        }
+        if (!groupId) continue
         const bucket = sessionsByGroup.get(groupId) ?? []
         bucket.push(session)
         sessionsByGroup.set(groupId, bucket)
     }
 
-    const summarize = (id: string | null, name: string, groupedSessions: SessionSummary[]): SecondarySessionGroup => ({
+    const summarize = (id: string, name: string, groupedSessions: SessionSummary[]): SecondarySessionGroup => ({
         id,
         name,
         sessions: groupedSessions,
@@ -67,12 +61,32 @@ export function buildSecondarySessionGroups(
         )
     })
 
-    return [
-        ...(ungrouped.length > 0 ? [summarize(null, ungroupedName, ungrouped)] : []),
-        ...projectGroups.map((group) => summarize(
-            group.id,
-            group.name,
-            sessionsByGroup.get(group.id) ?? []
-        ))
-    ]
+    return projectGroups.map((group) => summarize(
+        group.id,
+        group.name,
+        sessionsByGroup.get(group.id) ?? []
+    ))
+}
+
+export function getUngroupedSessions(
+    projectKey: string,
+    sessions: SessionSummary[],
+    groups: SessionGroup[],
+    memberships: SessionGroupMembership[]
+): SessionSummary[] {
+    const projectGroupIds = new Set(
+        groups
+            .filter((group) => group.projectKey === projectKey)
+            .map((group) => group.id)
+    )
+    const groupedSessionIds = new Set(
+        memberships
+            .filter((membership) => (
+                membership.projectKey === projectKey
+                && projectGroupIds.has(membership.groupId)
+            ))
+            .map((membership) => membership.sessionId)
+    )
+
+    return sessions.filter((session) => !groupedSessionIds.has(session.id))
 }

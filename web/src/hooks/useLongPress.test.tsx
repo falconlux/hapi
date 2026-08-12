@@ -18,12 +18,14 @@ function NativeButtonProbe(props: {
     onClick: () => void
     onLongPress: () => void
     longPressEnabled?: boolean
+    contextMenuEnabled?: boolean
 }) {
     const handlers = useLongPress({
         onClick: props.onClick,
         onLongPress: props.onLongPress,
         interaction: 'touch-only-native-click',
         longPressEnabled: props.longPressEnabled,
+        contextMenuEnabled: props.contextMenuEnabled,
     })
     return (
         <button type="button" data-testid="native-button" {...handlers}>
@@ -284,6 +286,56 @@ describe('useLongPress', () => {
         expect(onLongPress).not.toHaveBeenCalled()
         expect(onClick).toHaveBeenCalledOnce()
         expect(contextMenuWasNotPrevented).toBe(true)
+    })
+
+    it('can opt a native button into the same action for desktop context menu', () => {
+        const onClick = vi.fn()
+        const onLongPress = vi.fn()
+        const { getByTestId } = render(
+            <NativeButtonProbe
+                onClick={onClick}
+                onLongPress={onLongPress}
+                contextMenuEnabled
+            />,
+        )
+        const button = getByTestId('native-button')
+
+        const contextMenuWasNotPrevented = fireEvent.contextMenu(button, {
+            clientX: 25,
+            clientY: 40,
+        })
+
+        expect(contextMenuWasNotPrevented).toBe(false)
+        expect(onLongPress).toHaveBeenCalledWith({ x: 25, y: 40 })
+        expect(onClick).not.toHaveBeenCalled()
+    })
+
+    it('cancels an opted-in native long press after touch movement', () => {
+        const onClick = vi.fn()
+        const onLongPress = vi.fn()
+        const { getByTestId } = render(
+            <NativeButtonProbe
+                onClick={onClick}
+                onLongPress={onLongPress}
+                contextMenuEnabled
+            />,
+        )
+        const button = getByTestId('native-button')
+
+        fireEvent.touchStart(button, { touches: [{ clientX: 10, clientY: 10 }] })
+        fireEvent.touchMove(button, { touches: [{ clientX: 10, clientY: 40 }] })
+        act(() => {
+            now += 500
+            vi.advanceTimersByTime(500)
+        })
+        const contextMenuWasNotPrevented = fireEvent.contextMenu(button, {
+            clientX: 10,
+            clientY: 40,
+        })
+
+        expect(contextMenuWasNotPrevented).toBe(false)
+        expect(onLongPress).not.toHaveBeenCalled()
+        expect(onClick).not.toHaveBeenCalled()
     })
 
     it('can disable only the long-press override without disabling normal click', () => {

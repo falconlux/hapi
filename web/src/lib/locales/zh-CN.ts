@@ -89,6 +89,7 @@ export default {
   'session.group.create': '新增分组',
   'session.group.rename': '重命名分组',
   'session.group.delete': '删除分组',
+  'session.group.actions': '分组操作',
   'session.group.createTitle': '新增会话分组',
   'session.group.renameTitle': '重命名会话分组',
   'session.group.deleteTitle': '删除会话分组',

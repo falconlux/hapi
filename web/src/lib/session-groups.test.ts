@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionGroup, SessionGroupMembership, SessionSummary } from '@/types/api'
-import { buildSecondarySessionGroups, getSessionProjectKey } from './session-groups'
+import { buildSecondarySessionGroups, getSessionProjectKey, getUngroupedSessions } from './session-groups'
 
 function makeSession(id: string, overrides: Partial<SessionSummary> = {}): SessionSummary {
     return {
@@ -42,24 +42,25 @@ describe('session secondary groups', () => {
         }))).toBe('/project/a')
     })
 
-    it('partitions memberships without leaking another project and keeps empty groups', () => {
+    it('builds only named groups without leaking another project and keeps empty groups', () => {
         const sessions = [makeSession('one'), makeSession('two'), makeSession('three')]
         const memberships: SessionGroupMembership[] = [
             { sessionId: 'one', groupId: groups[0]!.id, projectKey: '/project/a', updatedAt: 10 },
             { sessionId: 'two', groupId: groups[2]!.id, projectKey: '/project/b', updatedAt: 10 }
         ]
 
-        const result = buildSecondarySessionGroups('/project/a', sessions, groups, memberships, 'Ungrouped')
+        const result = buildSecondarySessionGroups('/project/a', sessions, groups, memberships)
 
         expect(result.map((group) => [group.name, group.sessions.map((session) => session.id)])).toEqual([
-            ['Ungrouped', ['two', 'three']],
             ['Review', ['one']],
             ['Later', []]
         ])
         expect(result.some((group) => group.name === 'Foreign')).toBe(false)
+        expect(getUngroupedSessions('/project/a', sessions, groups, memberships).map((session) => session.id))
+            .toEqual(['two', 'three'])
     })
 
-    it('summarizes count, thinking, and pending for custom and ungrouped buckets', () => {
+    it('summarizes count, thinking, and pending for named groups', () => {
         const sessions = [
             makeSession('thinking', { active: true, thinking: true, updatedAt: 30 }),
             makeSession('pending', { active: true, pendingRequestsCount: 2, updatedAt: 20 }),
@@ -70,11 +71,11 @@ describe('session secondary groups', () => {
             { sessionId: 'pending', groupId: groups[0]!.id, projectKey: '/project/a', updatedAt: 1 }
         ]
 
-        const result = buildSecondarySessionGroups('/project/a', sessions, groups, memberships, 'Ungrouped')
-        const ungrouped = result.find((group) => group.id === null)
+        const result = buildSecondarySessionGroups('/project/a', sessions, groups, memberships)
         const review = result.find((group) => group.id === groups[0]!.id)
 
-        expect(ungrouped).toMatchObject({ count: 1, thinkingCount: 0, pendingCount: 1 })
         expect(review).toMatchObject({ count: 2, thinkingCount: 1, pendingCount: 2, latestUpdatedAt: 30 })
+        expect(getUngroupedSessions('/project/a', sessions, groups, memberships).map((session) => session.id))
+            .toEqual(['ungrouped'])
     })
 })
