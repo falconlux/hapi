@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { archivePeer, deletePeer, unarchivePeer } from './archivePeer'
+import { archivePeer, deletePeer, restartPeer, unarchivePeer } from './archivePeer'
 
 const callerId = 'aaaaaaaa-1111-4111-8111-111111111111'
 const peerId = 'bbbbbbbb-2222-4222-8222-222222222222'
 const credentials = { apiUrl: 'http://hub.test', accessToken: 'token' }
 
-function createHttp(options: { active?: boolean; archived?: boolean; peerPath?: string; omitCaller?: boolean; duplicate?: boolean; status?: number; archiveStatus?: number; deleteStatus?: number } = {}) {
+function createHttp(options: { active?: boolean; archived?: boolean; peerPath?: string; omitCaller?: boolean; duplicate?: boolean; status?: number; archiveStatus?: number; reopenStatus?: number; reopenSessionId?: string; deleteStatus?: number; activePolls?: boolean[] } = {}) {
+    let pollIndex = 0
     const sessions = [
         ...(options.omitCaller ? [] : [{ id: callerId, active: true, metadata: { path: '/project/a' } }]),
         { id: peerId, active: options.active ?? false, metadata: { path: options.peerPath ?? '/project/a', ...(options.archived ? { lifecycleState: 'archived' } : {}) } },
@@ -14,12 +15,22 @@ function createHttp(options: { active?: boolean; archived?: boolean; peerPath?: 
     return {
         post: vi.fn(async (url: string, body?: unknown) => {
             if (url.endsWith('/api/auth')) return { status: 200, data: { token: 'jwt' } }
-            const status = url.endsWith('/archive') ? options.archiveStatus ?? options.status ?? 200 : options.status ?? 200
-            return { status, data: status >= 400 ? { error: 'denied' } : { ok: true }, body }
+            const status = url.endsWith('/archive') ? options.archiveStatus ?? options.status ?? 200
+                : url.endsWith('/reopen') ? options.reopenStatus ?? options.status ?? 200
+                    : options.status ?? 200
+            const data = status >= 400 ? { error: 'denied' }
+                : url.endsWith('/reopen') ? { ok: true, sessionId: options.reopenSessionId ?? peerId, resumed: true }
+                    : { ok: true }
+            return { status, data, body }
         }),
-        get: vi.fn(async (url: string) => url.endsWith('/api/sessions')
-            ? { status: 200, data: { sessions } }
-            : Promise.reject(new Error(`unexpected GET ${url}`))),
+        get: vi.fn(async (url: string) => {
+            if (url.endsWith('/api/sessions')) return { status: 200, data: { sessions } }
+            if (url.endsWith(`/api/sessions/${peerId}`)) {
+                const active = options.activePolls?.[Math.min(pollIndex++, options.activePolls.length - 1)] ?? false
+                return { status: 200, data: { session: { ...sessions[1], active } } }
+            }
+            return Promise.reject(new Error(`unexpected GET ${url}`))
+        }),
         delete: vi.fn(async () => {
             const status = options.deleteStatus ?? 200
             return { status, data: status >= 400 ? { error: 'delete failed' } : { ok: true } }
@@ -77,6 +88,45 @@ describe('archivePeer / unarchivePeer', () => {
     it('does not unarchive an active target and maps Hub authorization failure', async () => {
         await expect(unarchivePeer({ ...credentials, callerSessionId: callerId, sessionIdPrefix: 'bbbb', http: createHttp({ active: true, archived: true }) as never })).rejects.toThrow(/active session/)
         await expect(archivePeer({ ...credentials, callerSessionId: callerId, sessionIdPrefix: 'bbbb', http: createHttp({ status: 403 }) as never })).rejects.toMatchObject({ code: 'auth_failed' })
+    })
+})
+
+describe('restartPeer', () => {
+    it('reopens inactive and archived targets directly with the same HAPI session id', async () => {
+        for (const archived of [false, true]) {
+            const http = createHttp({ archived })
+            await expect(restartPeer({ ...credentials, callerSessionId: callerId, sessionIdPrefix: 'bbbb', http: http as never })).resolves.toEqual({ sessionId: peerId, restarted: true, projectKey: '/project/a' })
+            expect(http.post).toHaveBeenLastCalledWith(`http://hub.test/api/sessions/${peerId}/reopen`, {}, expect.any(Object))
+        }
+    })
+
+    it('safely stops an active peer, waits for inactive, then reopens it', async () => {
+        const http = createHttp({ active: true, activePolls: [true, false] })
+        const sleep = vi.fn(async () => {})
+        await restartPeer({ ...credentials, callerSessionId: callerId, sessionIdPrefix: 'bbbb', http: http as never, sleep })
+        expect(http.post).toHaveBeenNthCalledWith(2, `http://hub.test/api/sessions/${peerId}/archive`, { allowInactive: true }, expect.any(Object))
+        expect(http.post).toHaveBeenNthCalledWith(3, `http://hub.test/api/sessions/${peerId}/reopen`, {}, expect.any(Object))
+        expect(sleep).toHaveBeenCalledOnce()
+    })
+
+    it('fails closed for missing, ambiguous, cross-project, forged, and current-session targets', async () => {
+        await expect(restartPeer({ ...credentials, callerSessionId: callerId, sessionIdPrefix: 'missing', http: createHttp() as never })).rejects.toMatchObject({ code: 'not_found' })
+        await expect(restartPeer({ ...credentials, callerSessionId: callerId, sessionIdPrefix: 'bbbb', http: createHttp({ duplicate: true }) as never })).rejects.toMatchObject({ code: 'ambiguous' })
+        await expect(restartPeer({ ...credentials, callerSessionId: callerId, sessionIdPrefix: 'bbbb', http: createHttp({ peerPath: '/project/b' }) as never })).rejects.toThrow(/different project/)
+        await expect(restartPeer({ ...credentials, callerSessionId: callerId, callerProjectKey: '/project/b', sessionIdPrefix: 'bbbb', http: createHttp() as never })).rejects.toThrow(/could not be verified/)
+        await expect(restartPeer({ ...credentials, callerSessionId: callerId, sessionIdPrefix: callerId, http: createHttp() as never })).rejects.toThrow(/current HAPI session/)
+    })
+
+    it('does not reopen after safe-stop failure and maps reopen failure', async () => {
+        const stopFailed = createHttp({ active: true, archiveStatus: 500 })
+        await expect(restartPeer({ ...credentials, callerSessionId: callerId, sessionIdPrefix: 'bbbb', http: stopFailed as never })).rejects.toThrow(/safe stop/)
+        expect(stopFailed.post.mock.calls.some(([url]) => url.endsWith('/reopen'))).toBe(false)
+
+        await expect(restartPeer({ ...credentials, callerSessionId: callerId, sessionIdPrefix: 'bbbb', http: createHttp({ reopenStatus: 503 }) as never })).rejects.toThrow(/reopen/)
+    })
+
+    it('rejects a reopen result that changes the HAPI session id', async () => {
+        await expect(restartPeer({ ...credentials, callerSessionId: callerId, sessionIdPrefix: 'bbbb', http: createHttp({ reopenSessionId: 'new-id' }) as never })).rejects.toThrow(/preserve/)
     })
 })
 

@@ -84,7 +84,12 @@ const MANUAL_APPROVAL_EXACT_TOOL_NAMES = new Set([
     'hapi_delete_peer',
     'happy__delete_peer',
     'mcp__hapi__delete_peer',
-    'delete peer session'
+    'delete peer session',
+    'restart_peer',
+    'hapi_restart_peer',
+    'happy__restart_peer',
+    'mcp__hapi__restart_peer',
+    'restart peer session'
 ]);
 
 export function requiresManualApproval(toolName: string): boolean {
@@ -117,6 +122,8 @@ const SENSITIVE_TOOL_NAME_HINTS = [
     'unarchive peer',
     'delete_peer',
     'delete peer',
+    'restart_peer',
+    'restart peer',
 ];
 const AUTO_APPROVE_WRITE_TOOL_HINTS = [
     'write',

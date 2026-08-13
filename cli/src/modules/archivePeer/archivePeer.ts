@@ -17,6 +17,7 @@ export type ArchivePeerOptions = {
     apiUrl?: string
     accessToken?: string
     http?: AxiosInstance
+    sleep?: (ms: number) => Promise<void>
 }
 
 export type ArchivePeerResult = {
@@ -154,4 +155,79 @@ export async function deletePeer(
         throw requestError('delete_peer', deleteResponse)
     }
     return { sessionId: target.id, deleted: true, projectKey: targetProjectKey }
+}
+
+export async function restartPeer(
+    options: ArchivePeerOptions
+): Promise<{ sessionId: string; restarted: boolean; projectKey: string }> {
+    const prefix = options.sessionIdPrefix.trim()
+    if (!prefix) throw new PingPeerError('bad_args', 'session id prefix is required')
+    if (!options.callerSessionId.trim()) throw new PingPeerError('bad_args', 'current HAPI session id is required')
+
+    const apiUrl = resolveApiUrl(options.apiUrl)
+    const accessToken = resolveAccessToken(options.accessToken)
+    const http = options.http ?? axios
+    const sleep = options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)))
+    const jwt = await exchangeJwt(apiUrl, accessToken, http)
+    const sessions = await listSessions(apiUrl, jwt, http)
+    const caller = sessions.find((session) => session.id === options.callerSessionId)
+    if (!caller) throw new PingPeerError('not_found', 'current HAPI session is unavailable in this namespace')
+    const callerProjectKey = options.callerProjectKey?.trim() || projectKey(caller)
+    const callerLiveProjectKey = projectKey(caller)
+    if (!callerProjectKey) throw new PingPeerError('bad_args', 'current HAPI session project context is unavailable')
+    if (!callerLiveProjectKey || callerLiveProjectKey !== callerProjectKey) {
+        throw new PingPeerError('bad_args', 'current HAPI session project context could not be verified')
+    }
+
+    const target = resolveSessionByPrefix(sessions, prefix)
+    if (target.id === caller.id) throw new PingPeerError('bad_args', 'restart_peer cannot target the current HAPI session')
+    const targetProjectKey = projectKey(target)
+    if (!targetProjectKey || targetProjectKey !== callerProjectKey) {
+        throw new PingPeerError('bad_args', 'target session belongs to a different project')
+    }
+
+    if (target.active) {
+        const archiveResponse = await http.post(
+            `${apiUrl}/api/sessions/${encodeURIComponent(target.id)}/archive`,
+            { allowInactive: true },
+            { headers: authHeaders(jwt), timeout: 30_000, validateStatus: () => true }
+        )
+        if (archiveResponse.status < 200 || archiveResponse.status >= 300 || archiveResponse.data?.ok !== true) {
+            throw requestError('restart_peer safe stop', archiveResponse)
+        }
+
+        let inactive = false
+        for (let attempt = 0; attempt < 30; attempt += 1) {
+            const response = await http.get(
+                `${apiUrl}/api/sessions/${encodeURIComponent(target.id)}`,
+                { headers: authHeaders(jwt), timeout: 10_000, validateStatus: () => true }
+            )
+            if (response.status < 200 || response.status >= 300 || !response.data?.session) {
+                throw requestError('restart_peer wait for inactive', response)
+            }
+            if (response.data.session.active === false) {
+                inactive = true
+                break
+            }
+            await sleep(1_000)
+        }
+        if (!inactive) throw new PingPeerError('timeout', 'restart_peer target did not become inactive within 30 seconds')
+    }
+
+    const reopenResponse = await http.post(
+        `${apiUrl}/api/sessions/${encodeURIComponent(target.id)}/reopen`,
+        {},
+        { headers: authHeaders(jwt), timeout: 60_000, validateStatus: () => true }
+    )
+    if (reopenResponse.status < 200 || reopenResponse.status >= 300 || reopenResponse.data?.ok !== true) {
+        throw requestError('restart_peer reopen', reopenResponse)
+    }
+    if (reopenResponse.data.sessionId !== target.id) {
+        throw new PingPeerError('send_failed', 'restart_peer did not preserve the target HAPI session id')
+    }
+    return {
+        sessionId: target.id,
+        restarted: reopenResponse.data.resumed !== false,
+        projectKey: targetProjectKey
+    }
 }

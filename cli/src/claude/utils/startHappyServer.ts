@@ -37,8 +37,8 @@ import {
 import { projectGroupToolDefinitions, PROJECT_GROUP_TOOL_NAMES } from '@/modules/projectGroups/mcpDefinitions';
 import { renamePeer } from '@/modules/renamePeer/renamePeer';
 import { renamePeerToolDefinition } from '@/modules/renamePeer/mcpDefinition';
-import { archivePeer, deletePeer, unarchivePeer } from '@/modules/archivePeer/archivePeer';
-import { archivePeerToolDefinition, deletePeerToolDefinition, unarchivePeerToolDefinition } from '@/modules/archivePeer/mcpDefinition';
+import { archivePeer, deletePeer, restartPeer, unarchivePeer } from '@/modules/archivePeer/archivePeer';
+import { archivePeerToolDefinition, deletePeerToolDefinition, restartPeerToolDefinition, unarchivePeerToolDefinition } from '@/modules/archivePeer/mcpDefinition';
 
 type StartHappyServerOptions = {
     emitTitleSummary?: boolean;
@@ -63,7 +63,8 @@ const CLAUDE_MANUAL_APPROVAL_HAPI_TOOLS = new Set([
     'rename_peer',
     'archive_peer',
     'unarchive_peer',
-    'delete_peer'
+    'delete_peer',
+    'restart_peer'
 ]);
 
 /**
@@ -598,6 +599,16 @@ function createHapiMcpServer(
             return { content: [{ type: 'text' as const, text: `Failed to delete peer: ${message}` }], isError: true };
         }
     });
+    mcp.registerTool<any, any>('restart_peer', restartPeerToolDefinition, async (args: { sessionIdPrefix: string }) => {
+        try {
+            const metadata = client.getMetadata();
+            const result = await restartPeer({ ...args, callerSessionId: client.sessionId, callerProjectKey: metadata?.worktree?.basePath ?? metadata?.path ?? null });
+            return { content: [{ type: 'text' as const, text: `Restarted peer ${result.sessionId}` }], structuredContent: result, isError: false };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { content: [{ type: 'text' as const, text: `Failed to restart peer: ${message}` }], isError: true };
+        }
+    });
 
 
     if (skillLookup) {
@@ -723,7 +734,7 @@ export async function startHappyServer(client: ApiSessionClient, options: StartH
         ? ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer']
         : ['display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer'];
     toolNames.push(...PROJECT_GROUP_TOOL_NAMES);
-    toolNames.push('rename_peer', 'archive_peer', 'unarchive_peer', 'delete_peer');
+    toolNames.push('rename_peer', 'archive_peer', 'unarchive_peer', 'delete_peer', 'restart_peer');
     if (options.skillLookup) {
         toolNames.push('skill_lookup');
     }

@@ -411,7 +411,7 @@ describe('PermissionAdapter', () => {
     it.each(['safe-yolo', 'yolo', 'always-proceed'] as const)(
         'keeps archive peer writes pending in %s mode',
         async (mode) => {
-            for (const title of ['Archive Peer Session', 'Unarchive Peer Session', 'Delete Peer Session']) {
+            for (const title of ['Archive Peer Session', 'Unarchive Peer Session', 'Delete Peer Session', 'Restart Peer Session']) {
                 const harness = createHarnessWithMode(() => mode);
                 harness.emitPermissionRequest(buildRequest({ id: `${title}-${mode}`, toolCallId: `${title}-${mode}`, title, rawInput: { sessionIdPrefix: 'abcd' } }));
                 await flushAsyncWork();

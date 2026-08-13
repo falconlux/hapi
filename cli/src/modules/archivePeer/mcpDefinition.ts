@@ -24,3 +24,9 @@ export const deletePeerToolDefinition = {
         confirm: z.literal(true).describe('Must be exactly true to confirm permanent deletion')
     })
 } as const
+
+export const restartPeerToolDefinition = {
+    title: 'Restart Peer Session',
+    description: 'Restart one peer HAPI session in the same namespace and project while preserving its session id, history, name, and group. Active targets are safely archived/stopped and observed inactive before reopen; inactive or archived targets are reopened directly. Concurrent already-running reopen is treated as success. Always requires manual approval.',
+    inputSchema
+} as const

@@ -74,7 +74,7 @@ vi.mock('@/claude/utils/startHappyServer', () => ({
         harness.startHappyServerOptions = options
         return {
             url: 'http://127.0.0.1:1234',
-            toolNames: ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer', 'list_project_groups', 'create_project_group', 'rename_project_group', 'delete_project_group', 'move_sessions_to_group', 'rename_peer', 'archive_peer', 'unarchive_peer', 'delete_peer', 'skill_lookup'],
+            toolNames: ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer', 'list_project_groups', 'create_project_group', 'rename_project_group', 'delete_project_group', 'move_sessions_to_group', 'rename_peer', 'archive_peer', 'unarchive_peer', 'delete_peer', 'restart_peer', 'skill_lookup'],
             stop: harness.stopServer
         }
     })
@@ -167,7 +167,7 @@ describe('runAgentSession', () => {
             '--url',
             'http://127.0.0.1:1234',
             '--tools',
-            'change_title,display_image,display_video,display_media,list_peers,create_peer,ping_peer,inspect_peer,list_project_groups,create_project_group,rename_project_group,delete_project_group,move_sessions_to_group,rename_peer,archive_peer,unarchive_peer,delete_peer,skill_lookup'
+            'change_title,display_image,display_video,display_media,list_peers,create_peer,ping_peer,inspect_peer,list_project_groups,create_project_group,rename_project_group,delete_project_group,move_sessions_to_group,rename_peer,archive_peer,unarchive_peer,delete_peer,restart_peer,skill_lookup'
         ])
         expect(harness.newSessionOptions).toMatchObject({
             cwd: '/tmp/project',

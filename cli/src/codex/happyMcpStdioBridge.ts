@@ -24,9 +24,9 @@ import {
 } from '@hapi/protocol/sessionCitation';
 import { projectGroupToolDefinitions, PROJECT_GROUP_TOOL_NAMES } from '@/modules/projectGroups/mcpDefinitions';
 import { renamePeerToolDefinition } from '@/modules/renamePeer/mcpDefinition';
-import { archivePeerToolDefinition, deletePeerToolDefinition, unarchivePeerToolDefinition } from '@/modules/archivePeer/mcpDefinition';
+import { archivePeerToolDefinition, deletePeerToolDefinition, restartPeerToolDefinition, unarchivePeerToolDefinition } from '@/modules/archivePeer/mcpDefinition';
 
-const DEFAULT_TOOL_NAMES = ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer', ...PROJECT_GROUP_TOOL_NAMES, 'rename_peer', 'archive_peer', 'unarchive_peer', 'delete_peer'];
+const DEFAULT_TOOL_NAMES = ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer', ...PROJECT_GROUP_TOOL_NAMES, 'rename_peer', 'archive_peer', 'unarchive_peer', 'delete_peer', 'restart_peer'];
 
 function parseArgs(argv: string[]): { url: string | null; toolNames: Set<string> } {
   let url: string | null = null;
@@ -368,6 +368,7 @@ export async function runHappyMcpStdioBridge(argv: string[]): Promise<void> {
       ['archive_peer', archivePeerToolDefinition],
       ['unarchive_peer', unarchivePeerToolDefinition],
       ['delete_peer', deletePeerToolDefinition],
+      ['restart_peer', restartPeerToolDefinition],
     ] as const) {
       if (!toolNames.has(toolName)) continue;
       server.registerTool<any, any>(toolName, definition, async (args: Record<string, unknown>) => {
