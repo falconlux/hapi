@@ -36,12 +36,20 @@ describe('machines routes', () => {
             active: true,
             createdAt: 1,
             updatedAt: 1,
-            metadata: { path: '/tmp/manager', host: 'localhost', name: 'Manager' }
+            metadata: { path: '/tmp/project', host: 'localhost', name: 'Manager' }
+        }
+        const child = {
+            id: 'child-1',
+            namespace: 'default',
+            active: true,
+            createdAt: 2,
+            updatedAt: 2,
+            metadata: { path: '/tmp/project', host: 'localhost', name: 'Worker' }
         }
         const engine = {
             getMachine: () => machine,
             getMachineByNamespace: () => machine,
-            getSessionByNamespace: (id: string) => id === manager.id ? manager : undefined,
+            getSessionByNamespace: (id: string) => id === manager.id ? manager : id === child.id ? child : undefined,
             getSessionsByNamespace: () => [manager],
             spawnSession: async (...args: unknown[]) => {
                 calls.push({ name: 'spawn', args })
@@ -84,6 +92,39 @@ describe('machines routes', () => {
         expect(message.text).toContain('Review the change')
         expect(message.text).toContain('Manager session: manager-1')
         expect(message.text).toContain('ping_peer')
+    })
+
+    it('rejects a cross-project or missing-project manager link before spawning', async () => {
+        for (const metadata of [{ path: '/tmp/other' }, {}]) {
+            let spawned = false
+            const manager = { id: 'manager-1', namespace: 'default', metadata }
+            const machine = createMachine()
+            const engine = {
+                getMachine: () => machine,
+                getMachineByNamespace: () => machine,
+                getSessionByNamespace: (id: string) => id === manager.id ? manager : undefined,
+                getSessionsByNamespace: () => [manager],
+                spawnSession: async () => { spawned = true; return { type: 'success', sessionId: 'child-1' } }
+            } as unknown as SyncEngine
+            const app = new Hono<WebAppEnv>()
+            app.use('*', async (c, next) => { c.set('namespace', 'default'); await next() })
+            app.route('/api', createMachinesRoutes(() => engine))
+
+            const response = await app.request('/api/machines/machine-1/agent-sessions', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    title: 'Worker',
+                    cwd: '/tmp/project',
+                    objective: 'work',
+                    managerSessionId: manager.id
+                })
+            })
+
+            expect(response.status).toBe(403)
+            expect(await response.json()).toMatchObject({ code: 'manager_project_mismatch' })
+            expect(spawned).toBe(false)
+        }
     })
 
     it('rejects an empty agent-session title before spawning', async () => {

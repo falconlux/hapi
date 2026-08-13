@@ -11,6 +11,7 @@
 import axios, { type AxiosInstance } from 'axios'
 import { extractAssistantPlainText, isObject } from '@hapi/protocol'
 import { normalizeSessionIdPrefix } from '@hapi/protocol/sessionCitation'
+import { getCanonicalSessionProjectKey } from '@hapi/protocol'
 import { configuration } from '@/configuration'
 import { getAuthToken } from '@/api/auth'
 import { buildHubRequestHeaders } from '@/api/hubExtraHeaders'
@@ -55,6 +56,8 @@ export type PingPeerSessionSummary = {
 export type PingPeerOptions = {
     sessionIdPrefix: string
     message: string
+    callerSessionId?: string
+    callerProjectKey?: string | null
     waitActiveSecs?: number
     apiUrl?: string
     accessToken?: string
@@ -551,16 +554,35 @@ export async function pingPeer(options: PingPeerOptions): Promise<PingPeerResult
     const sleep = options.sleep ?? defaultSleep
     const now = options.now ?? Date.now
     const onProgress = options.onProgress
+    const callerSessionId = options.callerSessionId?.trim() || process.env.HAPI_SESSION_ID?.trim()
+    if (!callerSessionId) {
+        throw new PingPeerError('bad_args', 'current HAPI session id is required for project-scoped peer messaging')
+    }
 
     const jwt = await exchangeJwt(apiUrl, accessToken, http)
+    const caller = await getSession(apiUrl, jwt, callerSessionId, http)
+    const callerLiveProjectKey = getCanonicalSessionProjectKey(caller.metadata)
+    const callerProjectKey = options.callerProjectKey?.trim() || callerLiveProjectKey
+    if (!callerProjectKey || !callerLiveProjectKey || callerProjectKey !== callerLiveProjectKey) {
+        throw new PingPeerError('bad_args', 'current HAPI session project context could not be verified')
+    }
     const sessions = await listSessions(apiUrl, jwt, http)
     const matched = resolveSessionByPrefix(sessions, prefix)
+    if (matched.id === caller.id) {
+        throw new PingPeerError('bad_args', 'ping_peer cannot target the current HAPI session')
+    }
+    if (getCanonicalSessionProjectKey(matched.metadata) !== callerProjectKey) {
+        throw new PingPeerError('bad_args', 'target session belongs to a different project')
+    }
     const name = resolvePeerSessionLabel(matched)
     onProgress?.(`resolved ${matched.id}  active=${matched.active}  name="${name}"`)
 
     let resumed = false
     const ensureActive = async (progressMessage: string): Promise<PingPeerSessionSummary> => {
         const session = await getSession(apiUrl, jwt, matched.id, http)
+        if (getCanonicalSessionProjectKey(session.metadata) !== callerProjectKey) {
+            throw new PingPeerError('bad_args', 'target session project context changed or could not be verified')
+        }
         if (session.active) {
             return session
         }

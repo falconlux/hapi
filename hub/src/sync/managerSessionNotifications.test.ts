@@ -36,12 +36,12 @@ function createEngine(store: Store) {
     return { engine, cliEmitted, sseEvents }
 }
 
-function createHarness(childCount: number = 1) {
+function createHarness(childCount: number = 1, childPath: string = '/tmp/project') {
     const store = new Store(':memory:')
     const { engine, cliEmitted, sseEvents } = createEngine(store)
     const manager = engine.getOrCreateSession(
         'manager-tag',
-        { path: '/tmp/manager', host: 'localhost', name: 'Manager', flavor: 'codex' },
+        { path: '/tmp/project', host: 'localhost', name: 'Manager', flavor: 'codex' },
         null,
         'default'
     )
@@ -49,7 +49,7 @@ function createHarness(childCount: number = 1) {
     const children = Array.from({ length: childCount }, (_, index) => {
         const child = engine.getOrCreateSession(
             `child-tag-${index}`,
-            { path: `/tmp/child-${index}`, host: 'localhost', name: `Worker ${index}`, flavor: 'codex' },
+            { ...(childPath ? { path: childPath } : {}), host: 'localhost', name: `Worker ${index}`, flavor: 'codex' },
             null,
             'default'
         )
@@ -60,6 +60,21 @@ function createHarness(childCount: number = 1) {
 }
 
 describe('manager-linked agent sessions', () => {
+    it('does not notify a linked manager when either canonical project is missing or different', async () => {
+        for (const childPath of ['/tmp/other']) {
+            const { engine, children: [child] } = createHarness(1, childPath)
+            let sends = 0
+            engine.sendMessage = async () => { sends += 1 }
+
+            engine.handleSessionEnd({ sid: child!.id, time: Date.now(), reason: 'completed' })
+            await new Promise((resolve) => setTimeout(resolve, 0))
+
+            expect(sends).toBe(0)
+            expect(engine.getSession(child!.id)?.metadata?.managerNotificationState?.terminal).toBeUndefined()
+            engine.stop()
+        }
+    })
+
     it('sends one terminal notification for sequential duplicate and conflicting end events', async () => {
         const { engine, manager, children: [child] } = createHarness()
         const messages: Array<{ sessionId: string; text: string; localId?: string | null }> = []
@@ -128,7 +143,7 @@ describe('manager-linked agent sessions', () => {
         await waitFor(() => engine.getSession(child!.id)?.metadata?.managerNotificationState?.terminal?.status === 'pending')
         const replacementManager = engine.getOrCreateSession(
             'replacement-manager',
-            { path: '/tmp/replacement-manager', host: 'localhost', name: 'Replacement Manager', flavor: 'codex' },
+            { path: '/tmp/project', host: 'localhost', name: 'Replacement Manager', flavor: 'codex' },
             null,
             'default'
         )

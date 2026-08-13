@@ -336,6 +336,8 @@ function createHapiMcpServer(
             const result = await pingPeer({
                 sessionIdPrefix: args.sessionIdPrefix,
                 message: args.message,
+                callerSessionId: client.sessionId,
+                callerProjectKey: client.getMetadata()?.worktree?.basePath ?? client.getMetadata()?.path ?? null,
             });
             return {
                 content: [

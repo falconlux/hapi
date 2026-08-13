@@ -7,7 +7,7 @@
  * - No E2E encryption; data is stored as JSON in SQLite
  */
 
-import { isKnownFlavor, type LocalResumeTarget, type ResumableSession, type SessionEndReason } from '@hapi/protocol'
+import { getCanonicalSessionProjectKey, isKnownFlavor, type LocalResumeTarget, type ResumableSession, type SessionEndReason } from '@hapi/protocol'
 import {
     cliBinaryUpdatedOnDisk,
     isMachineCapabilitySkewed,
@@ -1043,6 +1043,10 @@ export class SyncEngine {
     private async notifyManagerSessionEnd(child: Session, reason?: SessionEndReason): Promise<void> {
         const linkedManagerSessionId = child.metadata?.managerSessionId
         if (!linkedManagerSessionId || linkedManagerSessionId === child.id) return
+        const manager = this.getSessionByNamespace(linkedManagerSessionId, child.namespace)
+        const childProjectKey = getCanonicalSessionProjectKey(child.metadata)
+        const managerProjectKey = getCanonicalSessionProjectKey(manager?.metadata)
+        if (!childProjectKey || !managerProjectKey || childProjectKey !== managerProjectKey) return
 
         const claimId = randomUUID()
         const requestedState = reason === 'completed' ? 'completed' : 'failed'
@@ -1058,10 +1062,10 @@ export class SyncEngine {
         if (claim.result !== 'claimed') return
 
         try {
-            const manager = this.getSessionByNamespace(claim.managerSessionId, child.namespace)
-            if (!manager) throw new Error('Manager session is unavailable')
+            const claimedManager = this.getSessionByNamespace(claim.managerSessionId, child.namespace)
+            if (!claimedManager) throw new Error('Manager session is unavailable')
             let targetSessionId = claim.managerSessionId
-            if (!manager.active) {
+            if (!claimedManager.active) {
                 const resumed = await this.resumeSession(claim.managerSessionId, child.namespace)
                 if (resumed.type !== 'success') throw new Error('Manager session resume failed')
                 targetSessionId = resumed.sessionId

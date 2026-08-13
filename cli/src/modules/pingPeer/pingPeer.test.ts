@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
     createPeerAgentSession,
     PingPeerError,
@@ -16,6 +16,7 @@ type MockResponse = {
 function createHttpMock(handlers: {
     post?: (url: string, body?: unknown) => MockResponse | Promise<MockResponse>
     get?: (url: string, config?: { params?: Record<string, unknown> }) => MockResponse | Promise<MockResponse>
+    currentSession?: PingPeerSessionSummary | null
 }) {
     return {
         post: vi.fn(async (url: string, body?: unknown) => {
@@ -25,10 +26,41 @@ function createHttpMock(handlers: {
             return handlers.post(url, body)
         }),
         get: vi.fn(async (url: string, config?: { params?: Record<string, unknown> }) => {
+            if (url.endsWith('/api/sessions/current-session')) {
+                if (handlers.currentSession === null) {
+                    return { status: 404, data: { error: 'not found' } }
+                }
+                return {
+                    status: 200,
+                    data: {
+                        session: handlers.currentSession ?? {
+                            id: 'current-session',
+                            active: true,
+                            metadata: { path: '/project/a' }
+                        }
+                    }
+                }
+            }
             if (!handlers.get) {
                 throw new Error(`unexpected GET ${url}`)
             }
-            return handlers.get(url, config)
+            const response = await handlers.get(url, config)
+            const body = response.data as {
+                session?: PingPeerSessionSummary
+                sessions?: PingPeerSessionSummary[]
+            }
+            const addDefaultProject = (session: PingPeerSessionSummary): PingPeerSessionSummary => ({
+                ...session,
+                metadata: { path: '/project/a', ...session.metadata }
+            })
+            return {
+                ...response,
+                data: body.session
+                    ? { ...body, session: addDefaultProject(body.session) }
+                    : body.sessions
+                        ? { ...body, sessions: body.sessions.map(addDefaultProject) }
+                        : response.data
+            }
         })
     }
 }
@@ -131,8 +163,13 @@ describe('pingPeer', () => {
     let sleepCalls: number[]
 
     beforeEach(() => {
+        process.env.HAPI_SESSION_ID = 'current-session'
         nowMs = 1_000_000
         sleepCalls = []
+    })
+
+    afterEach(() => {
+        delete process.env.HAPI_SESSION_ID
     })
 
     it('sends to an already-active session without resume', async () => {
@@ -192,6 +229,55 @@ describe('pingPeer', () => {
             resumed: false
         })
         expect(http.post).toHaveBeenCalledTimes(2)
+    })
+
+    it('refuses a target in a different canonical project before resume or send', async () => {
+        const http = createHttpMock({
+            get: (url) => url.endsWith('/api/sessions')
+                ? {
+                    status: 200,
+                    data: {
+                        sessions: [{
+                            id: 'foreign-session',
+                            active: true,
+                            metadata: { path: '/project/b' }
+                        }]
+                    }
+                }
+                : Promise.reject(new Error(`unexpected GET ${url}`)),
+            post: (url) => url.endsWith('/api/auth')
+                ? { status: 200, data: { token: 'jwt' } }
+                : Promise.reject(new Error(`unexpected POST ${url}`))
+        })
+
+        await expect(pingPeer({
+            sessionIdPrefix: 'foreign',
+            message: 'do work',
+            accessToken: 'tok',
+            apiUrl: 'http://hub.test',
+            http: http as never
+        })).rejects.toThrow(/different project/)
+        expect(http.post).toHaveBeenCalledOnce()
+    })
+
+    it('rejects missing or forged caller project context', async () => {
+        const http = createHttpMock({
+            currentSession: { id: 'current-session', active: true, metadata: null },
+            get: (url) => url.endsWith('/api/sessions')
+                ? { status: 200, data: { sessions: [] } }
+                : Promise.reject(new Error(`unexpected GET ${url}`)),
+            post: (url) => url.endsWith('/api/auth')
+                ? { status: 200, data: { token: 'jwt' } }
+                : Promise.reject(new Error(`unexpected POST ${url}`))
+        })
+        await expect(pingPeer({
+            sessionIdPrefix: 'target',
+            message: 'do work',
+            callerProjectKey: '/project/a',
+            accessToken: 'tok',
+            apiUrl: 'http://hub.test',
+            http: http as never
+        })).rejects.toThrow(/could not be verified/)
     })
 
     it('resumes an inactive session, waits for active, then sends', async () => {
@@ -738,6 +824,7 @@ describe('listSessions query params', () => {
         const result = await pingPeer({
             sessionIdPrefix: sessionId,
             message: 'hi',
+            callerSessionId: 'current-session',
             apiUrl: 'http://hub.test',
             accessToken: 'tok',
             http: pingHttp as never

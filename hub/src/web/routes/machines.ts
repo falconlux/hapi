@@ -12,6 +12,7 @@ import type { SyncEngine } from '../../sync/syncEngine'
 import { RpcTargetMissingError } from '../../sync/rpcGateway'
 import type { WebAppEnv } from '../middleware/auth'
 import { requireMachine } from './guards'
+import { getCanonicalSessionProjectKey, normalizeSessionProjectKey } from '@hapi/protocol'
 
 export function createMachinesRoutes(getSyncEngine: () => SyncEngine | null): Hono<WebAppEnv> {
     const app = new Hono<WebAppEnv>()
@@ -133,12 +134,26 @@ export function createMachinesRoutes(getSyncEngine: () => SyncEngine | null): Ho
         const title = parsed.data.title.trim()
         const cwd = parsed.data.cwd.trim().replace(/[\\/]+$/, '') || parsed.data.cwd.trim()
         const managerSessionId = parsed.data.managerSessionId
-        if (managerSessionId && !engine.getSessionByNamespace(managerSessionId, namespace)) {
+        const managerSession = managerSessionId
+            ? engine.getSessionByNamespace(managerSessionId, namespace)
+            : undefined
+        if (managerSessionId && !managerSession) {
             return c.json({
                 type: 'error',
                 error: 'managerSessionId is not available in this namespace',
                 code: 'invalid_manager_session'
             }, 400)
+        }
+        if (managerSessionId) {
+            const managerProjectKey = getCanonicalSessionProjectKey(managerSession?.metadata)
+            const requestedProjectKey = normalizeSessionProjectKey(cwd)
+            if (!managerProjectKey || !requestedProjectKey || managerProjectKey !== requestedProjectKey) {
+                return c.json({
+                    type: 'error',
+                    error: 'managerSessionId and cwd must belong to the same canonical project',
+                    code: 'manager_project_mismatch'
+                }, 403)
+            }
         }
 
         const normalizedTitle = title.replace(/\s+/g, ' ').toLowerCase()
@@ -192,7 +207,16 @@ export function createMachinesRoutes(getSyncEngine: () => SyncEngine | null): Ho
                 }, 504)
             }
 
-            if (managerSessionId) engine.setSessionManager(sessionId, managerSessionId, namespace)
+            if (managerSessionId) {
+                const child = engine.getSessionByNamespace(sessionId, namespace)
+                const manager = engine.getSessionByNamespace(managerSessionId, namespace)
+                const childProjectKey = getCanonicalSessionProjectKey(child?.metadata)
+                const managerProjectKey = getCanonicalSessionProjectKey(manager?.metadata)
+                if (!childProjectKey || !managerProjectKey || childProjectKey !== managerProjectKey) {
+                    throw new Error('Created child and manager canonical projects do not match')
+                }
+                engine.setSessionManager(sessionId, managerSessionId, namespace)
+            }
             await engine.renameSession(sessionId, title)
 
             const objective = parsed.data.initialMessage ?? parsed.data.objective ?? ''
