@@ -215,13 +215,15 @@ describe('runHappyMcpStdioBridge tool forwarding', () => {
 
     it('registers and forwards peer archive tools when included in --tools', async () => {
         await runHappyMcpStdioBridge([
-            '--url', 'http://127.0.0.1:43006', '--tools', 'archive_peer,unarchive_peer'
+            '--url', 'http://127.0.0.1:43006', '--tools', 'archive_peer,unarchive_peer,delete_peer'
         ])
-        expect([...harness.tools.keys()]).toEqual(['archive_peer', 'unarchive_peer'])
+        expect([...harness.tools.keys()]).toEqual(['archive_peer', 'unarchive_peer', 'delete_peer'])
         await harness.tools.get('archive_peer')?.({ sessionIdPrefix: 'abcd' })
         await harness.tools.get('unarchive_peer')?.({ sessionIdPrefix: 'abcd' })
+        await harness.tools.get('delete_peer')?.({ sessionIdPrefix: 'abcd', confirm: true })
         expect(harness.callTool).toHaveBeenNthCalledWith(1, { name: 'archive_peer', arguments: { sessionIdPrefix: 'abcd' } })
         expect(harness.callTool).toHaveBeenNthCalledWith(2, { name: 'unarchive_peer', arguments: { sessionIdPrefix: 'abcd' } })
+        expect(harness.callTool).toHaveBeenNthCalledWith(3, { name: 'delete_peer', arguments: { sessionIdPrefix: 'abcd', confirm: true } })
     })
 
 })

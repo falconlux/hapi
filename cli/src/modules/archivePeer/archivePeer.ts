@@ -10,7 +10,7 @@ import {
     type PingPeerSessionSummary
 } from '@/modules/pingPeer/pingPeer'
 
-type ArchivePeerOptions = {
+export type ArchivePeerOptions = {
     sessionIdPrefix: string
     callerSessionId: string
     callerProjectKey?: string | null
@@ -102,4 +102,56 @@ export function archivePeer(options: ArchivePeerOptions): Promise<ArchivePeerRes
 
 export function unarchivePeer(options: ArchivePeerOptions): Promise<ArchivePeerResult> {
     return mutatePeerArchive(options, false)
+}
+
+export async function deletePeer(
+    options: ArchivePeerOptions & { confirm: boolean }
+): Promise<{ sessionId: string; deleted: true; projectKey: string }> {
+    if (options.confirm !== true) {
+        throw new PingPeerError('bad_args', 'confirm=true is required for permanent peer deletion')
+    }
+    const prefix = options.sessionIdPrefix.trim()
+    if (!prefix) throw new PingPeerError('bad_args', 'session id prefix is required')
+    if (!options.callerSessionId.trim()) throw new PingPeerError('bad_args', 'current HAPI session id is required')
+
+    const apiUrl = resolveApiUrl(options.apiUrl)
+    const accessToken = resolveAccessToken(options.accessToken)
+    const http = options.http ?? axios
+    const jwt = await exchangeJwt(apiUrl, accessToken, http)
+    const sessions = await listSessions(apiUrl, jwt, http)
+    const caller = sessions.find((session) => session.id === options.callerSessionId)
+    if (!caller) throw new PingPeerError('not_found', 'current HAPI session is unavailable in this namespace')
+    const callerProjectKey = options.callerProjectKey?.trim() || projectKey(caller)
+    const callerLiveProjectKey = projectKey(caller)
+    if (!callerProjectKey) throw new PingPeerError('bad_args', 'current HAPI session project context is unavailable')
+    if (!callerLiveProjectKey || callerLiveProjectKey !== callerProjectKey) {
+        throw new PingPeerError('bad_args', 'current HAPI session project context could not be verified')
+    }
+
+    const target = resolveSessionByPrefix(sessions, prefix)
+    if (target.id === caller.id) throw new PingPeerError('bad_args', 'delete_peer cannot target the current HAPI session')
+    const targetProjectKey = projectKey(target)
+    if (!targetProjectKey || targetProjectKey !== callerProjectKey) {
+        throw new PingPeerError('bad_args', 'target session belongs to a different project')
+    }
+
+    if (target.active) {
+        const archiveResponse = await http.post(
+            `${apiUrl}/api/sessions/${encodeURIComponent(target.id)}/archive`,
+            { allowInactive: true },
+            { headers: authHeaders(jwt), timeout: 30_000, validateStatus: () => true }
+        )
+        if (archiveResponse.status < 200 || archiveResponse.status >= 300 || archiveResponse.data?.ok !== true) {
+            throw requestError('delete_peer safe stop', archiveResponse)
+        }
+    }
+
+    const deleteResponse = await http.delete(
+        `${apiUrl}/api/sessions/${encodeURIComponent(target.id)}`,
+        { headers: authHeaders(jwt), timeout: 30_000, validateStatus: () => true }
+    )
+    if (deleteResponse.status < 200 || deleteResponse.status >= 300 || deleteResponse.data?.ok !== true) {
+        throw requestError('delete_peer', deleteResponse)
+    }
+    return { sessionId: target.id, deleted: true, projectKey: targetProjectKey }
 }

@@ -37,8 +37,8 @@ import {
 import { projectGroupToolDefinitions, PROJECT_GROUP_TOOL_NAMES } from '@/modules/projectGroups/mcpDefinitions';
 import { renamePeer } from '@/modules/renamePeer/renamePeer';
 import { renamePeerToolDefinition } from '@/modules/renamePeer/mcpDefinition';
-import { archivePeer, unarchivePeer } from '@/modules/archivePeer/archivePeer';
-import { archivePeerToolDefinition, unarchivePeerToolDefinition } from '@/modules/archivePeer/mcpDefinition';
+import { archivePeer, deletePeer, unarchivePeer } from '@/modules/archivePeer/archivePeer';
+import { archivePeerToolDefinition, deletePeerToolDefinition, unarchivePeerToolDefinition } from '@/modules/archivePeer/mcpDefinition';
 
 type StartHappyServerOptions = {
     emitTitleSummary?: boolean;
@@ -62,7 +62,8 @@ const CLAUDE_MANUAL_APPROVAL_HAPI_TOOLS = new Set([
     'move_sessions_to_group',
     'rename_peer',
     'archive_peer',
-    'unarchive_peer'
+    'unarchive_peer',
+    'delete_peer'
 ]);
 
 /**
@@ -583,6 +584,20 @@ function createHapiMcpServer(
     };
     mcp.registerTool<any, any>('archive_peer', archivePeerToolDefinition, (args: { sessionIdPrefix: string }) => mutatePeerArchive(archivePeer, args));
     mcp.registerTool<any, any>('unarchive_peer', unarchivePeerToolDefinition, (args: { sessionIdPrefix: string }) => mutatePeerArchive(unarchivePeer, args));
+    mcp.registerTool<any, any>('delete_peer', deletePeerToolDefinition, async (args: { sessionIdPrefix: string; confirm: true }) => {
+        try {
+            const metadata = client.getMetadata();
+            const result = await deletePeer({
+                ...args,
+                callerSessionId: client.sessionId,
+                callerProjectKey: metadata?.worktree?.basePath ?? metadata?.path ?? null
+            });
+            return { content: [{ type: 'text' as const, text: `Permanently deleted peer ${result.sessionId}` }], structuredContent: result, isError: false };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { content: [{ type: 'text' as const, text: `Failed to delete peer: ${message}` }], isError: true };
+        }
+    });
 
 
     if (skillLookup) {
@@ -708,7 +723,7 @@ export async function startHappyServer(client: ApiSessionClient, options: StartH
         ? ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer']
         : ['display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer'];
     toolNames.push(...PROJECT_GROUP_TOOL_NAMES);
-    toolNames.push('rename_peer', 'archive_peer', 'unarchive_peer');
+    toolNames.push('rename_peer', 'archive_peer', 'unarchive_peer', 'delete_peer');
     if (options.skillLookup) {
         toolNames.push('skill_lookup');
     }

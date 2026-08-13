@@ -16,3 +16,11 @@ export const unarchivePeerToolDefinition = {
     description: 'Persistently restore one archived peer HAPI session in the same namespace and project without resuming or spawning its agent process. History and group membership are preserved. Idempotent and always requires manual approval.',
     inputSchema
 } as const
+
+export const deletePeerToolDefinition = {
+    title: 'Delete Peer Session',
+    description: 'Permanently delete one peer HAPI session in the same namespace and project using the same semantics as the Web sidebar delete action. Active sessions are safely archived/stopped first. Deletes history and group membership. Requires confirm=true and manual approval.',
+    inputSchema: inputSchema.extend({
+        confirm: z.literal(true).describe('Must be exactly true to confirm permanent deletion')
+    })
+} as const

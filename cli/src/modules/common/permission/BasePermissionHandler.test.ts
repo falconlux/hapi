@@ -137,7 +137,10 @@ describe('resolveToolAutoApprovalDecision project groups', () => {
         'Archive Peer Session',
         'unarchive_peer',
         'mcp__hapi__unarchive_peer',
-        'Unarchive Peer Session'
+        'Unarchive Peer Session',
+        'delete_peer',
+        'mcp__hapi__delete_peer',
+        'Delete Peer Session'
     ])('keeps the write tool %s pending in every permission mode', (toolName) => {
         for (const mode of [
             undefined,
