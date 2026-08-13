@@ -361,6 +361,12 @@ export function createSessionsRoutes(getSyncEngine: () => SyncEngine | null): Ho
             if (!supported) return c.json({ error: `${operation} is not supported for ${flavor ?? 'unknown'} sessions` }, 409)
             try {
                 const result = await engine.mutateSessionContext(sessionResult.sessionId, operation)
+                if (!result || typeof result !== 'object' || (result as { success?: unknown }).success !== true) {
+                    const error = result && typeof result === 'object' && typeof (result as { error?: unknown }).error === 'string'
+                        ? (result as { error: string }).error
+                        : `Native ${operation} failed`
+                    return c.json({ error }, 409)
+                }
                 return c.json({ ok: true, result })
             } catch (error) {
                 return c.json({ error: error instanceof Error ? error.message : String(error) }, 409)
