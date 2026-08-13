@@ -390,6 +390,24 @@ describe('PermissionAdapter', () => {
         }
     );
 
+    it.each(['safe-yolo', 'yolo', 'always-proceed'] as const)(
+        'keeps rename_peer pending in %s mode',
+        async (mode) => {
+            const harness = createHarnessWithMode(() => mode);
+            harness.emitPermissionRequest(buildRequest({
+                id: `rename-${mode}`,
+                toolCallId: `rename-${mode}`,
+                title: 'Rename Peer Session',
+                rawInput: { sessionIdPrefix: 'abcd', title: 'New title' }
+            }));
+            await flushAsyncWork();
+            expect(harness.respondCalls).toEqual([]);
+            expect(harness.getAgentState().requests).toMatchObject({
+                [`rename-${mode}`]: { tool: 'Rename Peer Session' }
+            });
+        }
+    );
+
     it('auto-approves read-only non-write tools but keeps writes pending', async () => {
         const harness = createHarnessWithMode(() => 'read-only');
 

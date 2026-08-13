@@ -43,6 +43,7 @@ export type PingPeerSessionSummary = {
         name?: string
         flavor?: string | null
         path?: string | null
+        worktree?: { basePath?: string | null } | null
         lifecycleState?: string | null
         piSessionId?: string
         summary?: { text?: string } | null
@@ -209,7 +210,7 @@ export function resolveSessionByPrefix(
     return matches[0]!
 }
 
-async function listSessions(
+export async function listSessions(
     apiUrl: string,
     jwt: string,
     http: AxiosInstance,

@@ -201,4 +201,16 @@ describe('runHappyMcpStdioBridge tool forwarding', () => {
         })
     })
 
+    it('registers and forwards rename_peer when included in --tools', async () => {
+        await runHappyMcpStdioBridge([
+            '--url', 'http://127.0.0.1:43006', '--tools', 'rename_peer'
+        ])
+        const handler = harness.tools.get('rename_peer')
+        await handler?.({ sessionIdPrefix: 'abcd', title: 'New peer' })
+        expect(harness.callTool).toHaveBeenCalledWith({
+            name: 'rename_peer',
+            arguments: { sessionIdPrefix: 'abcd', title: 'New peer' }
+        })
+    })
+
 })

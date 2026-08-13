@@ -35,6 +35,8 @@ import {
     renameProjectGroup
 } from '@/modules/projectGroups/projectGroups';
 import { projectGroupToolDefinitions, PROJECT_GROUP_TOOL_NAMES } from '@/modules/projectGroups/mcpDefinitions';
+import { renamePeer } from '@/modules/renamePeer/renamePeer';
+import { renamePeerToolDefinition } from '@/modules/renamePeer/mcpDefinition';
 
 type StartHappyServerOptions = {
     emitTitleSummary?: boolean;
@@ -55,7 +57,8 @@ const CLAUDE_MANUAL_APPROVAL_HAPI_TOOLS = new Set([
     'create_project_group',
     'rename_project_group',
     'delete_project_group',
-    'move_sessions_to_group'
+    'move_sessions_to_group',
+    'rename_peer'
 ]);
 
 /**
@@ -537,6 +540,25 @@ function createHapiMcpServer(
         }
     });
 
+    mcp.registerTool<any, any>('rename_peer', renamePeerToolDefinition, async (args: { sessionIdPrefix: string; title: string }) => {
+        try {
+            const metadata = client.getMetadata();
+            const result = await renamePeer({
+                ...args,
+                callerSessionId: client.sessionId,
+                callerProjectKey: metadata?.worktree?.basePath ?? metadata?.path ?? null
+            });
+            return {
+                content: [{ type: 'text' as const, text: `Renamed peer ${result.sessionId} to "${result.title}"` }],
+                structuredContent: result,
+                isError: false
+            };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { content: [{ type: 'text' as const, text: `Failed to rename peer: ${message}` }], isError: true };
+        }
+    });
+
 
     if (skillLookup) {
         mcp.registerTool<any, any>('skill_lookup', {
@@ -661,6 +683,7 @@ export async function startHappyServer(client: ApiSessionClient, options: StartH
         ? ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer']
         : ['display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer'];
     toolNames.push(...PROJECT_GROUP_TOOL_NAMES);
+    toolNames.push('rename_peer');
     if (options.skillLookup) {
         toolNames.push('skill_lookup');
     }

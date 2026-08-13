@@ -64,7 +64,12 @@ const MANUAL_APPROVAL_EXACT_TOOL_NAMES = new Set([
     'hapi_move_sessions_to_group',
     'happy__move_sessions_to_group',
     'mcp__hapi__move_sessions_to_group',
-    'move sessions to group'
+    'move sessions to group',
+    'rename_peer',
+    'hapi_rename_peer',
+    'happy__rename_peer',
+    'mcp__hapi__rename_peer',
+    'rename peer session'
 ]);
 
 export function requiresManualApproval(toolName: string): boolean {
@@ -89,6 +94,8 @@ const SENSITIVE_TOOL_NAME_HINTS = [
     'delete project group',
     'move_sessions_to_group',
     'move sessions to group',
+    'rename_peer',
+    'rename peer',
 ];
 const AUTO_APPROVE_WRITE_TOOL_HINTS = [
     'write',

@@ -103,6 +103,15 @@ describe('startHappyServer skill_lookup', () => {
         expect(result.content?.[0]?.text).toContain('Skill not found: missing')
     })
 
+    it('keeps change_title registered for the current session alongside rename_peer', async () => {
+        const mcp = await connect(false)
+        const tools = await mcp.listTools()
+        const names = tools.tools.map((tool) => tool.name)
+
+        expect(names).toContain('change_title')
+        expect(names).toContain('rename_peer')
+    })
+
     it('does not expose the fallback tool to native-skill sessions', async () => {
         const mcp = await connect(false)
         const tools = await mcp.listTools()
@@ -121,6 +130,7 @@ describe('startHappyServer skill_lookup', () => {
             'rename_project_group',
             'delete_project_group',
             'move_sessions_to_group',
+            'rename_peer',
         ])
     })
 
@@ -158,7 +168,7 @@ describe('startHappyServer skill_lookup', () => {
         await mcp.connect(new StreamableHTTPClientTransport(new URL(server.url)))
         const tools = await mcp.listTools()
 
-        expect(server.toolNames).toEqual(['display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer', 'list_project_groups', 'create_project_group', 'rename_project_group', 'delete_project_group', 'move_sessions_to_group'])
+        expect(server.toolNames).toEqual(['display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer', 'list_project_groups', 'create_project_group', 'rename_project_group', 'delete_project_group', 'move_sessions_to_group', 'rename_peer'])
         expect(tools.tools.map((tool) => tool.name)).toEqual([
             'display_image',
             'display_video',
@@ -172,6 +182,7 @@ describe('startHappyServer skill_lookup', () => {
             'rename_project_group',
             'delete_project_group',
             'move_sessions_to_group',
+            'rename_peer',
         ])
     })
 
@@ -193,6 +204,7 @@ describe('toClaudeAllowedHapiMcpTools', () => {
             'rename_project_group',
             'delete_project_group',
             'move_sessions_to_group',
+            'rename_peer',
             'skill_lookup'
         ])).toEqual([
             'mcp__hapi__change_title',

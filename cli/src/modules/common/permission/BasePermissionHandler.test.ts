@@ -126,7 +126,12 @@ describe('resolveToolAutoApprovalDecision project groups', () => {
         'Delete Project Group',
         'move_sessions_to_group',
         'mcp__hapi__move_sessions_to_group',
-        'Move Sessions To Group'
+        'Move Sessions To Group',
+        'rename_peer',
+        'hapi_rename_peer',
+        'happy__rename_peer',
+        'mcp__hapi__rename_peer',
+        'Rename Peer Session'
     ])('keeps the write tool %s pending in every permission mode', (toolName) => {
         for (const mode of [
             undefined,
