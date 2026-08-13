@@ -18,6 +18,7 @@ import { listSlashCommands } from '@/modules/common/slashCommands';
 import { resolveOpencodeSlashCommand } from './utils/slashCommands';
 import { isRetryableConnectionError } from '@/utils/errorUtils';
 import { withRetry } from '@/utils/time';
+import { RPC_METHODS } from '@hapi/protocol/rpcMethods';
 
 export async function runOpencode(opts: {
     startedBy?: 'runner' | 'terminal';
@@ -127,8 +128,23 @@ export async function runOpencode(opts: {
     // genuinely local-mode session regardless of this flag's value.
     let compactTeardownInProgress = false;
     let currentPermissionMode: PermissionMode = opts.permissionMode ?? 'default';
+
     let sessionModel: string | null = initialModel;
     let sessionModelReasoningEffort: string | null = initialModelReasoningEffort;
+    session.rpcHandlerManager.registerHandler(RPC_METHODS.CompactSession, async () => {
+        if (!compactSupported || sessionWrapperRef.current?.mode !== 'remote' || compactTeardownInProgress) {
+            return { success: false, error: 'OpenCode native compaction is not available' };
+        }
+        messageQueue.pushIsolated('', { permissionMode: currentPermissionMode, model: sessionModel, modelReasoningEffort: sessionModelReasoningEffort, operation: 'compact' });
+        return { success: true, queued: true };
+    });
+    session.rpcHandlerManager.registerHandler(RPC_METHODS.ResetSession, async () => {
+        if (sessionWrapperRef.current?.mode !== 'remote' || compactTeardownInProgress) {
+            return { success: false, error: 'OpenCode native reset is not available' };
+        }
+        messageQueue.pushIsolated('', { permissionMode: currentPermissionMode, model: sessionModel, modelReasoningEffort: sessionModelReasoningEffort, operation: 'clear' });
+        return { success: true, queued: true };
+    });
     const hookServer = await startOpencodeHookServer({
         onEvent: (event) => {
             const currentSession = sessionWrapperRef.current;

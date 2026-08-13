@@ -39,6 +39,8 @@ import { renamePeer } from '@/modules/renamePeer/renamePeer';
 import { renamePeerToolDefinition } from '@/modules/renamePeer/mcpDefinition';
 import { archivePeer, deletePeer, restartPeer, unarchivePeer } from '@/modules/archivePeer/archivePeer';
 import { archivePeerToolDefinition, deletePeerToolDefinition, restartPeerToolDefinition, unarchivePeerToolDefinition } from '@/modules/archivePeer/mcpDefinition';
+import { compactPeer, resetPeer } from '@/modules/peerContext/peerContext';
+import { compactPeerToolDefinition, resetPeerToolDefinition } from '@/modules/peerContext/mcpDefinition';
 
 type StartHappyServerOptions = {
     emitTitleSummary?: boolean;
@@ -64,7 +66,9 @@ const CLAUDE_MANUAL_APPROVAL_HAPI_TOOLS = new Set([
     'archive_peer',
     'unarchive_peer',
     'delete_peer',
-    'restart_peer'
+    'restart_peer',
+    'compact_peer',
+    'reset_peer'
 ]);
 
 /**
@@ -611,6 +615,19 @@ function createHapiMcpServer(
             return { content: [{ type: 'text' as const, text: `Failed to restart peer: ${message}` }], isError: true };
         }
     });
+    const peerContext = async (operation: 'compact' | 'reset', args: { sessionIdPrefix: string; confirm?: true }) => {
+        try {
+            const metadata = client.getMetadata();
+            const result = operation === 'compact'
+                ? await compactPeer({ ...args, callerSessionId: client.sessionId, callerProjectKey: metadata?.worktree?.basePath ?? metadata?.path ?? null })
+                : await resetPeer({ ...args, confirm: args.confirm === true, callerSessionId: client.sessionId, callerProjectKey: metadata?.worktree?.basePath ?? metadata?.path ?? null });
+            return { content: [{ type: 'text' as const, text: `${operation === 'compact' ? 'Compacted' : 'Reset'} peer ${result.sessionId}` }], structuredContent: result, isError: false };
+        } catch (error) {
+            return { content: [{ type: 'text' as const, text: `Failed to ${operation} peer: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+        }
+    };
+    mcp.registerTool<any, any>('compact_peer', compactPeerToolDefinition, (args: { sessionIdPrefix: string }) => peerContext('compact', args));
+    mcp.registerTool<any, any>('reset_peer', resetPeerToolDefinition, (args: { sessionIdPrefix: string; confirm: true }) => peerContext('reset', args));
 
 
     if (skillLookup) {
@@ -736,7 +753,7 @@ export async function startHappyServer(client: ApiSessionClient, options: StartH
         ? ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer']
         : ['display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer'];
     toolNames.push(...PROJECT_GROUP_TOOL_NAMES);
-    toolNames.push('rename_peer', 'archive_peer', 'unarchive_peer', 'delete_peer', 'restart_peer');
+    toolNames.push('rename_peer', 'archive_peer', 'unarchive_peer', 'delete_peer', 'restart_peer', 'compact_peer', 'reset_peer');
     if (options.skillLookup) {
         toolNames.push('skill_lookup');
     }

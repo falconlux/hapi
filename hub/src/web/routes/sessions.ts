@@ -350,6 +350,24 @@ export function createSessionsRoutes(getSyncEngine: () => SyncEngine | null): Ho
         return c.json({ ok: true })
     })
 
+    for (const operation of ['compact', 'reset'] as const) {
+        app.post(`/sessions/:id/${operation}`, async (c) => {
+            const engine = requireSyncEngine(c, getSyncEngine)
+            if (engine instanceof Response) return engine
+            const sessionResult = requireSessionFromParam(c, engine, { requireActive: true })
+            if (sessionResult instanceof Response) return sessionResult
+            const flavor = sessionResult.session.metadata?.flavor
+            const supported = operation === 'compact' ? flavor === 'codex' || flavor === 'opencode' : flavor === 'opencode'
+            if (!supported) return c.json({ error: `${operation} is not supported for ${flavor ?? 'unknown'} sessions` }, 409)
+            try {
+                const result = await engine.mutateSessionContext(sessionResult.sessionId, operation)
+                return c.json({ ok: true, result })
+            } catch (error) {
+                return c.json({ error: error instanceof Error ? error.message : String(error) }, 409)
+            }
+        })
+    }
+
     app.post('/sessions/:id/fork', async (c) => {
         const engine = requireSyncEngine(c, getSyncEngine)
         if (engine instanceof Response) {

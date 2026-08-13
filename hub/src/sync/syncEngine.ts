@@ -1210,6 +1210,10 @@ export class SyncEngine {
         await this.rpcGateway.abortSession(sessionId)
     }
 
+    async mutateSessionContext(sessionId: string, operation: 'compact' | 'reset'): Promise<unknown> {
+        return await this.rpcGateway.mutateSessionContext(sessionId, operation)
+    }
+
     private assertConversationHistoryIdle(session: Session): void {
         if (!session.active) {
             throw new Error('Session must be active')

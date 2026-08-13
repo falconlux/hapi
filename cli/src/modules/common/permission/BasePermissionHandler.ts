@@ -124,6 +124,10 @@ const SENSITIVE_TOOL_NAME_HINTS = [
     'delete peer',
     'restart_peer',
     'restart peer',
+    'compact_peer',
+    'compact peer',
+    'reset_peer',
+    'reset peer',
 ];
 const AUTO_APPROVE_WRITE_TOOL_HINTS = [
     'write',

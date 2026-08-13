@@ -126,6 +126,10 @@ export class RpcGateway {
         await this.sessionRpc(sessionId, RPC_METHODS.Abort, { reason: 'User aborted via Telegram Bot' })
     }
 
+    async mutateSessionContext(sessionId: string, operation: 'compact' | 'reset'): Promise<unknown> {
+        return await this.sessionRpc(sessionId, operation === 'compact' ? RPC_METHODS.CompactSession : RPC_METHODS.ResetSession, {}, operation === 'compact' ? 10 * 60_000 : 60_000)
+    }
+
     async switchSession(sessionId: string, to: 'remote' | 'local'): Promise<void> {
         await this.sessionRpc(sessionId, RPC_METHODS.Switch, { to })
     }

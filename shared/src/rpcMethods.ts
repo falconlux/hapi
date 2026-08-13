@@ -46,6 +46,8 @@ export const RPC_METHODS = {
     SteerQueuedMessage: 'steer-queued-message',
     ForkConversation: 'fork-conversation',
     RewindConversation: 'rewind-conversation',
+    CompactSession: 'compact-session',
+    ResetSession: 'reset-session',
 } as const
 
 export const RPC_TARGET_MISSING_ERROR_CODE = 'rpc_target_missing' as const

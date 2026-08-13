@@ -3691,6 +3691,30 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             return true;
         };
 
+        session.client.rpcHandlerManager.registerHandler(RPC_METHODS.CompactSession, async () => {
+            await interruptActiveTurn();
+            resetCurrentTurnState();
+            const threadId = await resumeExistingThreadForCompact({
+                permissionMode: session.getPermissionMode() ?? 'default',
+                model: session.getModel() ?? undefined,
+                collaborationMode: session.getCollaborationMode() ?? 'default'
+            });
+            if (!threadId) return { success: false, error: 'Nothing to compact' };
+            const completion = beginManualCompact(threadId);
+            void completion.catch(() => {});
+            try {
+                await appServerClient.compactThread({ threadId }, { signal: this.abortController.signal });
+                await completion;
+                return { success: true };
+            } finally {
+                if (manualCompact?.threadId === threadId) {
+                    const compact = manualCompact;
+                    clearManualCompact(compact);
+                    compact.resolve();
+                }
+            }
+        });
+
         // While a Codex turn is active the main loop waits on
         // waitForTurnOrRecovery() instead of MessageQueue2's waiter. Wake that
         // loop as soon as a new web message reaches the queue so it can be sent
