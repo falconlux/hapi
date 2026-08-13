@@ -131,7 +131,13 @@ describe('resolveToolAutoApprovalDecision project groups', () => {
         'hapi_rename_peer',
         'happy__rename_peer',
         'mcp__hapi__rename_peer',
-        'Rename Peer Session'
+        'Rename Peer Session',
+        'archive_peer',
+        'mcp__hapi__archive_peer',
+        'Archive Peer Session',
+        'unarchive_peer',
+        'mcp__hapi__unarchive_peer',
+        'Unarchive Peer Session'
     ])('keeps the write tool %s pending in every permission mode', (toolName) => {
         for (const mode of [
             undefined,

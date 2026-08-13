@@ -24,8 +24,9 @@ import {
 } from '@hapi/protocol/sessionCitation';
 import { projectGroupToolDefinitions, PROJECT_GROUP_TOOL_NAMES } from '@/modules/projectGroups/mcpDefinitions';
 import { renamePeerToolDefinition } from '@/modules/renamePeer/mcpDefinition';
+import { archivePeerToolDefinition, unarchivePeerToolDefinition } from '@/modules/archivePeer/mcpDefinition';
 
-const DEFAULT_TOOL_NAMES = ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer', ...PROJECT_GROUP_TOOL_NAMES, 'rename_peer'];
+const DEFAULT_TOOL_NAMES = ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer', ...PROJECT_GROUP_TOOL_NAMES, 'rename_peer', 'archive_peer', 'unarchive_peer'];
 
 function parseArgs(argv: string[]): { url: string | null; toolNames: Set<string> } {
   let url: string | null = null;
@@ -270,7 +271,7 @@ export async function runHappyMcpStdioBridge(argv: string[]): Promise<void> {
       server.registerTool<any, any>(
         'list_peers',
         {
-          description: 'List peer HAPI sessions on the same hub/namespace (id prefix, active, flavor, name). Uses this session\'s hub credentials - works from runner-spawned agents without being on the hub host. Prefer this over shelling `hapi ping-peer --list`. Then call inspect_peer / ping_peer with a listed id.',
+          description: 'List peer HAPI sessions on the same hub/namespace (id prefix, active, archived, flavor, name). Uses this session\'s hub credentials - works from runner-spawned agents without being on the hub host. Prefer this over shelling `hapi ping-peer --list`. Then call inspect_peer / ping_peer with a listed id.',
           title: 'List Peer Sessions',
           inputSchema: listPeersInputSchema,
         },
@@ -361,6 +362,21 @@ export async function runHappyMcpStdioBridge(argv: string[]): Promise<void> {
           }
         }
       );
+    }
+
+    for (const [toolName, definition] of [
+      ['archive_peer', archivePeerToolDefinition],
+      ['unarchive_peer', unarchivePeerToolDefinition],
+    ] as const) {
+      if (!toolNames.has(toolName)) continue;
+      server.registerTool<any, any>(toolName, definition, async (args: Record<string, unknown>) => {
+        try {
+          const client = await ensureHttpClient();
+          return await client.callTool({ name: toolName, arguments: args }) as any;
+        } catch (error) {
+          return { content: [{ type: 'text' as const, text: `Failed to call ${toolName}: ${error instanceof Error ? error.message : String(error)}` }], isError: true };
+        }
+      });
     }
 
     const skillLookupInputSchema: z.ZodTypeAny = z.object({

@@ -19,7 +19,7 @@ export const PROJECT_GROUP_WRITE_TOOL_NAMES = new Set<string>(PROJECT_GROUP_TOOL
 export const projectGroupToolDefinitions = {
     list_project_groups: {
         title: 'List Project Groups',
-        description: 'Read-only. List HAPI project groups and membership counts, including session id/title/path and sessions not assigned to a named group. Optionally filter by exact projectKey. Uses the current HAPI hub and namespace.',
+        description: 'Read-only. List HAPI project groups and membership counts, including each session id/title/path/archived state and sessions not assigned to a named group. Optionally filter by exact projectKey. Uses the current HAPI hub and namespace.',
         inputSchema: z.object({ projectKey: SessionGroupProjectKeySchema.optional() })
     },
     create_project_group: {

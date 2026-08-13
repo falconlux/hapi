@@ -63,6 +63,7 @@ function createApp(session: Session, opts?: {
     getSessionExport?: (sessionId: string, session: Session) => unknown
     sessionExists?: boolean
     archiveSession?: (sessionId: string) => Promise<void>
+    unarchiveSession?: (sessionId: string) => Promise<void>
     getCursorChatStoreStatus?: SyncEngine['getCursorChatStoreStatus']
     listCodexModelsForSession?: SyncEngine['listCodexModelsForSession']
     forkConversation?: SyncEngine['forkConversation']
@@ -143,6 +144,7 @@ function createApp(session: Session, opts?: {
             status: { onDisk: true, store: 'acp' as const }
         })),
         archiveSession: archiveSessionMock,
+        unarchiveSession: opts?.unarchiveSession ?? (async () => {}),
         setSessionPinned: opts?.setSessionPinned ?? (() => {}),
         setSessionPinMode: opts?.setSessionPinMode ?? (() => {}),
         getSessionExport: opts?.getSessionExport ?? (() => ({
@@ -1340,6 +1342,43 @@ describe('sessions routes', () => {
             expect(response.status).toBe(200)
             expect(await response.json()).toEqual({ ok: true })
             expect(calls).toEqual(['session-1'])
+        })
+
+        it('archives an inactive completed row only when explicitly allowed', async () => {
+            const calls: string[] = []
+            const { app } = createApp(createSession({ active: false }), {
+                archiveSession: async (sessionId) => { calls.push(sessionId) }
+            })
+            const response = await app.request('/api/sessions/session-1/archive', {
+                method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ allowInactive: true })
+            })
+            expect(response.status).toBe(200)
+            expect(calls).toEqual(['session-1'])
+        })
+    })
+
+    describe('POST /sessions/:id/unarchive', () => {
+        it('clears archive metadata without resuming the session', async () => {
+            const calls: string[] = []
+            const { app } = createApp(createSession({ active: false, metadata: { path: '/tmp/project', host: 'localhost', flavor: 'codex', lifecycleState: 'archived' } }), {
+                unarchiveSession: async (sessionId) => { calls.push(sessionId) }
+            })
+            const response = await app.request('/api/sessions/session-1/unarchive', { method: 'POST' })
+            expect(response.status).toBe(200)
+            expect(await response.json()).toEqual({ ok: true })
+            expect(calls).toEqual(['session-1'])
+        })
+
+        it('is idempotent and refuses active rows', async () => {
+            let called = false
+            const inactive = createApp(createSession({ active: false }), { unarchiveSession: async () => { called = true } })
+            const already = await inactive.app.request('/api/sessions/session-1/unarchive', { method: 'POST' })
+            expect(await already.json()).toEqual({ ok: true, alreadyUnarchived: true })
+            expect(called).toBe(false)
+
+            const active = createApp(createSession({ active: true, metadata: { path: '/tmp/project', host: 'localhost', flavor: 'codex', lifecycleState: 'archived' } }))
+            const refused = await active.app.request('/api/sessions/session-1/unarchive', { method: 'POST' })
+            expect(refused.status).toBe(409)
         })
     })
 

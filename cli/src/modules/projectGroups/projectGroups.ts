@@ -35,6 +35,7 @@ export type ProjectGroupSession = {
     id: string
     title: string
     path: string | null
+    archived: boolean
 }
 
 export type ProjectGroupListItem = SessionGroup & {
@@ -77,7 +78,12 @@ function sessionTitle(session: ProjectSessionSummary): string {
 }
 
 function toProjectSession(session: ProjectSessionSummary): ProjectGroupSession {
-    return { id: session.id, title: sessionTitle(session), path: sessionPath(session) }
+    return {
+        id: session.id,
+        title: sessionTitle(session),
+        path: sessionPath(session),
+        archived: session.metadata?.lifecycleState === 'archived'
+    }
 }
 
 function requestError(action: string, response: { status: number; data?: any }): ProjectGroupError {

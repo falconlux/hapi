@@ -1758,6 +1758,10 @@ export class SyncEngine {
         this.handleSessionEnd({ sid: sessionId, time: Date.now() })
     }
 
+    async unarchiveSession(sessionId: string): Promise<void> {
+        await this.sessionCache.clearSessionArchiveMetadata(sessionId)
+    }
+
     /**
      * Apply the post-migration metadata flip in hapi.db:
      *   - metadata.cursorSessionProtocol = 'acp'

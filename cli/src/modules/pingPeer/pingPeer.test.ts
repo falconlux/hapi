@@ -596,6 +596,16 @@ describe('formatPeerSessionsList', () => {
         expect(text).toMatch(/more sessions available/)
     })
 
+    it('marks archived peers explicitly', async () => {
+        const { formatPeerSessionsList } = await import('./pingPeer')
+        const text = formatPeerSessionsList([{
+            id: 'aaaaaaaa-1111-1111-1111-111111111111',
+            active: false,
+            metadata: { name: 'Archived worker', lifecycleState: 'archived' }
+        }])
+        expect(text).toContain('archived=true')
+    })
+
     it('peerListFetchLimit pads for caller exclusion and overflow probe', async () => {
         const { peerListFetchLimit } = await import('./pingPeer')
         expect(peerListFetchLimit(100, { excludeCaller: true })).toBe(102)

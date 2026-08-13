@@ -118,6 +118,8 @@ export async function buildHapiMcpBridge(
     tools.rename_peer = {
         approval_mode: 'prompt'
     };
+    tools.archive_peer = { approval_mode: 'prompt' };
+    tools.unarchive_peer = { approval_mode: 'prompt' };
     for (const toolName of [
         'create_project_group',
         'rename_project_group',

@@ -439,11 +439,30 @@ export function createSessionsRoutes(getSyncEngine: () => SyncEngine | null): Ho
             return c.json({ ok: true, alreadyArchived: true })
         }
 
-        if (!sessionResult.session.active && lifecycleState !== 'running') {
+        const body = await c.req.json().catch(() => null) as { allowInactive?: unknown } | null
+        const allowInactive = body?.allowInactive === true
+        if (!sessionResult.session.active && lifecycleState !== 'running' && !allowInactive) {
             return c.json({ error: 'Session is inactive' }, 409)
         }
 
         await engine.archiveSession(sessionResult.sessionId)
+        return c.json({ ok: true })
+    })
+
+    app.post('/sessions/:id/unarchive', async (c) => {
+        const engine = requireSyncEngine(c, getSyncEngine)
+        if (engine instanceof Response) return engine
+
+        const sessionResult = requireSessionFromParam(c, engine)
+        if (sessionResult instanceof Response) return sessionResult
+        if (sessionResult.session.active) {
+            return c.json({ error: 'Active sessions cannot be unarchived' }, 409)
+        }
+        if (sessionResult.session.metadata?.lifecycleState !== 'archived') {
+            return c.json({ ok: true, alreadyUnarchived: true })
+        }
+
+        await engine.unarchiveSession(sessionResult.sessionId)
         return c.json({ ok: true })
     })
 

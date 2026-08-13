@@ -69,7 +69,17 @@ const MANUAL_APPROVAL_EXACT_TOOL_NAMES = new Set([
     'hapi_rename_peer',
     'happy__rename_peer',
     'mcp__hapi__rename_peer',
-    'rename peer session'
+    'rename peer session',
+    'archive_peer',
+    'hapi_archive_peer',
+    'happy__archive_peer',
+    'mcp__hapi__archive_peer',
+    'archive peer session',
+    'unarchive_peer',
+    'hapi_unarchive_peer',
+    'happy__unarchive_peer',
+    'mcp__hapi__unarchive_peer',
+    'unarchive peer session'
 ]);
 
 export function requiresManualApproval(toolName: string): boolean {
@@ -96,6 +106,10 @@ const SENSITIVE_TOOL_NAME_HINTS = [
     'move sessions to group',
     'rename_peer',
     'rename peer',
+    'archive_peer',
+    'archive peer',
+    'unarchive_peer',
+    'unarchive peer',
 ];
 const AUTO_APPROVE_WRITE_TOOL_HINTS = [
     'write',

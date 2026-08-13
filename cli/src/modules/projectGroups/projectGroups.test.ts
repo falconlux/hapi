@@ -61,7 +61,7 @@ describe('project group REST client', () => {
                     return {
                         status: 200,
                         data: { sessions: [
-                            { id: 'a-1', active: true, metadata: { name: 'Review worker', path: '/project/a' } },
+                            { id: 'a-1', active: false, metadata: { name: 'Review worker', path: '/project/a', lifecycleState: 'archived' } },
                             { id: 'a-2', active: true, metadata: { summary: { text: 'Coordinator' }, worktree: { basePath: '/project/a' }, path: '/tmp/wt' } },
                             { id: 'b-1', active: true, metadata: { name: 'Other', path: '/project/b' } }
                         ] }
@@ -77,9 +77,9 @@ describe('project group REST client', () => {
             http: http as never
         })).resolves.toEqual({
             projectKey: '/project/a',
-            groups: [{ ...group, count: 1, sessions: [{ id: 'a-1', title: 'Review worker', path: '/project/a' }] }],
+            groups: [{ ...group, count: 1, sessions: [{ id: 'a-1', title: 'Review worker', path: '/project/a', archived: true }] }],
             memberships: [{ sessionId: 'a-1', groupId: group.id, projectKey: '/project/a', updatedAt: 1 }],
-            unassigned: [{ id: 'a-2', title: 'Coordinator', path: '/project/a' }]
+            unassigned: [{ id: 'a-2', title: 'Coordinator', path: '/project/a', archived: false }]
         })
     })
 

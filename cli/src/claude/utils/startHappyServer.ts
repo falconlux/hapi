@@ -37,6 +37,8 @@ import {
 import { projectGroupToolDefinitions, PROJECT_GROUP_TOOL_NAMES } from '@/modules/projectGroups/mcpDefinitions';
 import { renamePeer } from '@/modules/renamePeer/renamePeer';
 import { renamePeerToolDefinition } from '@/modules/renamePeer/mcpDefinition';
+import { archivePeer, unarchivePeer } from '@/modules/archivePeer/archivePeer';
+import { archivePeerToolDefinition, unarchivePeerToolDefinition } from '@/modules/archivePeer/mcpDefinition';
 
 type StartHappyServerOptions = {
     emitTitleSummary?: boolean;
@@ -58,7 +60,9 @@ const CLAUDE_MANUAL_APPROVAL_HAPI_TOOLS = new Set([
     'rename_project_group',
     'delete_project_group',
     'move_sessions_to_group',
-    'rename_peer'
+    'rename_peer',
+    'archive_peer',
+    'unarchive_peer'
 ]);
 
 /**
@@ -399,7 +403,7 @@ function createHapiMcpServer(
     });
 
     mcp.registerTool<any, any>('list_peers', {
-        description: 'List peer HAPI sessions on the same hub/namespace (id prefix, active, flavor, name). Uses this session\'s hub credentials - works from runner-spawned agents without being on the hub host. Prefer this over shelling `hapi ping-peer --list`. Then call inspect_peer / ping_peer with a listed id.',
+        description: 'List peer HAPI sessions on the same hub/namespace (id prefix, active, archived, flavor, name). Uses this session\'s hub credentials - works from runner-spawned agents without being on the hub host. Prefer this over shelling `hapi ping-peer --list`. Then call inspect_peer / ping_peer with a listed id.',
         title: 'List Peer Sessions',
         inputSchema: listPeersInputSchema,
     }, async (args: { limit?: number }) => {
@@ -559,6 +563,27 @@ function createHapiMcpServer(
         }
     });
 
+    const mutatePeerArchive = async (action: typeof archivePeer, args: { sessionIdPrefix: string }) => {
+        try {
+            const metadata = client.getMetadata();
+            const result = await action({
+                ...args,
+                callerSessionId: client.sessionId,
+                callerProjectKey: metadata?.worktree?.basePath ?? metadata?.path ?? null
+            });
+            return {
+                content: [{ type: 'text' as const, text: `${result.archived ? 'Archived' : 'Unarchived'} peer ${result.sessionId}${result.alreadyInState ? ' (already in that state)' : ''}` }],
+                structuredContent: result,
+                isError: false
+            };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { content: [{ type: 'text' as const, text: `Failed to change peer archive state: ${message}` }], isError: true };
+        }
+    };
+    mcp.registerTool<any, any>('archive_peer', archivePeerToolDefinition, (args: { sessionIdPrefix: string }) => mutatePeerArchive(archivePeer, args));
+    mcp.registerTool<any, any>('unarchive_peer', unarchivePeerToolDefinition, (args: { sessionIdPrefix: string }) => mutatePeerArchive(unarchivePeer, args));
+
 
     if (skillLookup) {
         mcp.registerTool<any, any>('skill_lookup', {
@@ -683,7 +708,7 @@ export async function startHappyServer(client: ApiSessionClient, options: StartH
         ? ['change_title', 'display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer']
         : ['display_image', 'display_video', 'display_media', 'list_peers', 'create_peer', 'ping_peer', 'inspect_peer'];
     toolNames.push(...PROJECT_GROUP_TOOL_NAMES);
-    toolNames.push('rename_peer');
+    toolNames.push('rename_peer', 'archive_peer', 'unarchive_peer');
     if (options.skillLookup) {
         toolNames.push('skill_lookup');
     }

@@ -115,7 +115,9 @@ describe('PermissionHandler — YOLO plan mode', () => {
         'mcp__hapi__rename_project_group',
         'mcp__hapi__delete_project_group',
         'mcp__hapi__move_sessions_to_group',
-        'mcp__hapi__rename_peer'
+        'mcp__hapi__rename_peer',
+        'mcp__hapi__archive_peer',
+        'mcp__hapi__unarchive_peer'
     ])('forces manual approval for %s in bypassPermissions', async (toolName) => {
         const { session } = createFakeSession();
         const handler = new PermissionHandler(session);

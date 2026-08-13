@@ -45,6 +45,8 @@ export type PingPeerSessionSummary = {
         path?: string | null
         worktree?: { basePath?: string | null } | null
         lifecycleState?: string | null
+        archivedBy?: string | null
+        archiveReason?: string | null
         piSessionId?: string
         summary?: { text?: string } | null
     } | null
@@ -516,7 +518,8 @@ export function formatPeerSessionsList(
     const rows = sorted.slice(0, Math.max(1, maxRows)).map((session) => {
         const flavor = session.metadata?.flavor ?? '?'
         const name = resolvePeerSessionLabel(session)
-        return `  ${session.id}  active=${session.active}  flavor=${flavor}  ${name}`
+        const archived = session.metadata?.lifecycleState === 'archived'
+        return `  ${session.id}  active=${session.active}  archived=${archived}  flavor=${flavor}  ${name}`
     })
     const omitted = sorted.length - rows.length
     if (options.hasMore) {
