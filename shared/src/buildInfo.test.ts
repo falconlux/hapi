@@ -3,7 +3,7 @@ import { APP_VERSION } from './buildInfo'
 
 // This is the user-visible Web version injected by web/vite.config.ts.
 describe('APP_VERSION', () => {
-    it('matches the second 0.27.2 custom release', () => {
-        expect(APP_VERSION).toBe('0.27.2.2')
+    it('matches the third 0.27.2 custom release', () => {
+        expect(APP_VERSION).toBe('0.27.2.3')
     })
 })
