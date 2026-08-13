@@ -362,14 +362,11 @@ export function createSessionsRoutes(getSyncEngine: () => SyncEngine | null): Ho
             try {
                 const result = await engine.mutateSessionContext(sessionResult.sessionId, operation)
                 if (!result || typeof result !== 'object' || (result as { success?: unknown }).success !== true) {
-                    const error = result && typeof result === 'object' && typeof (result as { error?: unknown }).error === 'string'
-                        ? (result as { error: string }).error
-                        : `Native ${operation} failed`
-                    return c.json({ error }, 409)
+                    return c.json({ error: `Native ${operation} failed` }, 409)
                 }
                 return c.json({ ok: true, result })
             } catch (error) {
-                return c.json({ error: error instanceof Error ? error.message : String(error) }, 409)
+                return c.json({ error: `Native ${operation} failed` }, 409)
             }
         })
     }
