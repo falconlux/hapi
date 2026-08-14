@@ -1715,11 +1715,15 @@ describe('codexRemoteLauncher', () => {
         await vi.waitFor(() => expect(harness.startTurnMessages).toEqual(['first message']));
         session.queue.push('preserve me', mode);
         await vi.waitFor(() => expect(harness.steerTurnCalls).toHaveLength(1));
+        session.queue.push('later message', { ...mode, deliveryMode: 'queue' });
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(harness.steerTurnCalls).toHaveLength(1);
         harness.suppressTurnCompletion = false;
         harness.dispatchNotification?.('turn/completed', { status: 'Completed', turn: { id: 'turn-1' } });
-        await vi.waitFor(() => expect(harness.startTurnMessages).toEqual(['first message', 'preserve me']));
+        await vi.waitFor(() => expect(harness.startTurnMessages.slice(0, 2)).toEqual(['first message', 'preserve me']));
         session.queue.close();
         await expect(launcher).resolves.toBe('exit');
+        expect(harness.startTurnMessages).toEqual(['first message', 'preserve me', 'later message']);
     });
 
     it('wakes a running turn when guidance arrives after the turn has started', async () => {

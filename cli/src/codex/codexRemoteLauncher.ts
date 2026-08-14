@@ -3814,7 +3814,10 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                             continue;
                         } catch (error) {
                             logger.debug(`[Codex] Active turn ${turnId} could not be steered; queueing for next turn`, error);
-                            pending = message;
+                            pending = {
+                                ...message,
+                                mode: { ...message.mode, deliveryMode: 'queue' }
+                            };
                             sendVisibleStatus('Current Codex run could not accept guidance; queued for the next run.');
                             await waitForTurnOrRecovery(this.abortController.signal);
                             continue;
