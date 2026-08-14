@@ -58,6 +58,7 @@ import { useToast } from '@/lib/toast-context'
 import { useSessionGroups } from '@/hooks/queries/useSessionGroups'
 import { useSessionGroupActions } from '@/hooks/mutations/useSessionGroupActions'
 import { buildSecondarySessionGroups, getSessionProjectKey, getUngroupedSessions, type SecondarySessionGroup } from '@/lib/session-groups'
+import { basename } from '@/utils/path'
 
 export { getWorktreeSessionLabel } from '@/lib/sessionWorktreeLabel'
 
@@ -320,7 +321,7 @@ export function groupSessionsByDirectory(sessions: SessionSummary[]): SessionGro
             const hasActiveSession = group.sessions.some(s => s.active)
             const hasThinkingSession = group.sessions.some(s => s.active && s.thinking)
             const hasPinnedSession = group.sessions.some(s => s.pinned)
-            const displayName = getGroupDisplayName(group.directory)
+            const displayName = basename(group.directory)
 
             return {
                 key,
@@ -2287,7 +2288,7 @@ export function SessionList(props: {
                 <SessionGroupNameDialog
                     isOpen={true}
                     title={t('project.renameTitle')}
-                    initialName={projectDisplayNames.get(renameProjectKey) ?? getGroupDisplayName(renameProjectKey)}
+                    initialName={projectDisplayNames.get(renameProjectKey) ?? basename(renameProjectKey)}
                     onClose={() => setRenameProjectKey(null)}
                     onSubmit={async (name) => sessionGroupActions.renameProject(renameProjectKey, name)}
                     isPending={sessionGroupActions.isPending}

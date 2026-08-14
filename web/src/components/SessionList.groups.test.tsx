@@ -98,6 +98,25 @@ describe('SessionList secondary groups', () => {
         expect(screen.queryByRole('menuitem', { name: 'Delete group' })).not.toBeInTheDocument()
     })
 
+    it('falls back to the final path segment when no project display name exists', async () => {
+        const session = makeSession('plain', 'Plain session')
+        session.metadata = { ...session.metadata, path: '/workspace/foo' }
+        renderWithProviders(
+            <SessionList
+                sessions={[session]}
+                selectedSessionId={null}
+                onSelect={vi.fn()}
+                onNewSession={vi.fn()}
+                onRefresh={vi.fn()}
+                isLoading={false}
+                renderHeader={false}
+                api={null}
+            />
+        )
+        expect(screen.getByTitle('/workspace/foo')).toHaveTextContent('foo')
+        expect(screen.queryByText('workspace/foo')).not.toBeInTheDocument()
+    })
+
     it('renders direct sessions before named groups under the official directory group', async () => {
         const groupId = '11111111-1111-4111-8111-111111111111'
         const api = {
