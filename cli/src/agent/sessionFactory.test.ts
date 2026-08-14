@@ -246,7 +246,7 @@ describe('bootstrapExistingSession', () => {
         })
 
         expect(metadata.capabilities?.terminal).toBe(true)
-        expect(metadata.version).toBe('0.27.2+5')
+        expect(metadata.version).toBe('0.27.2+6')
     })
 })
 
@@ -381,7 +381,7 @@ describe('buildMachineMetadata runner-only capabilities', () => {
     it('omits machine RPC capabilities for terminal bootstrap metadata', () => {
         delete process.env.HAPI_RUNNER_SUPERVISED
         const metadata = buildMachineMetadata()
-        expect(metadata.happyCliVersion).toBe('0.27.2+5')
+        expect(metadata.happyCliVersion).toBe('0.27.2+6')
         expect(metadata.capabilities).toBeUndefined()
         expect(metadata.startedCliMtimeMs).toBeUndefined()
         expect(metadata.installedCliMtimeMs).toBeUndefined()
