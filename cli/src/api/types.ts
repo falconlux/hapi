@@ -74,8 +74,8 @@ export const MessageMetaSchema = z.object({
     // Claude jsonl echoes the remote (web/telegram) prompt as a second user row.
     // Hub notify ingest skips these so they do not consume a work_ad cause slot.
     isTranscriptEcho: z.boolean().optional(),
-    // Queue remains the default for existing clients. Pi-aware callers may
-    // explicitly request native steering while a turn is streaming.
+    // Queue remains the default. Callers must explicitly request native
+    // steering while a supported agent turn is streaming.
     deliveryMode: z.enum(['queue', 'steer']).optional(),
     fallbackModel: z.string().nullable().optional(),
     customSystemPrompt: z.string().nullable().optional(),

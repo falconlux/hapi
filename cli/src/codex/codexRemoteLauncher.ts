@@ -3717,9 +3717,9 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
 
         // While a Codex turn is active the main loop waits on
         // waitForTurnOrRecovery() instead of MessageQueue2's waiter. Wake that
-        // loop as soon as a new web message reaches the queue so it can be sent
-        // through turn/steer immediately rather than sitting there until the
-        // current turn completes.
+        // loop as soon as a new web message reaches the queue. Explicit steer
+        // may enter the active turn; ordinary queue delivery remains pending
+        // until the current turn completes.
         session.queue.setOnMessage(() => wakeLoop());
         while (!this.shouldExit) {
             logActiveHandles('loop-top');
@@ -3787,6 +3787,11 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                 }
 
                 if (turnInFlight) {
+                    if (message.mode.deliveryMode !== 'steer') {
+                        pending = message;
+                        await waitForTurnOrRecovery(this.abortController.signal);
+                        continue;
+                    }
                     const threadId = this.currentThreadId;
                     const turnId = this.currentTurnId;
                     if (threadId && turnId) {

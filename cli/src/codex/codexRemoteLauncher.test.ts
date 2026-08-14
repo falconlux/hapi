@@ -36,6 +36,7 @@ const harness = vi.hoisted(() => ({
     startTurnParams: [] as Array<Record<string, unknown>>,
     startTurnErrors: [] as Error[],
     steerTurnCalls: [] as Array<{ threadId: string; expectedTurnId: string; message: string }>,
+    steerTurnErrors: [] as Error[],
     interruptedTurns: [] as Array<{ threadId: string; turnId: string }>,
     interruptErrors: [] as Error[],
     rollbackCalls: [] as Array<{ threadId: string; numTurns: number }>,
@@ -1005,6 +1006,8 @@ vi.mock('./codexAppServerClient', () => {
                 expectedTurnId,
                 message: params?.input?.[0]?.text ?? ''
             });
+            const steerError = harness.steerTurnErrors.shift();
+            if (steerError) throw steerError;
 
             if (harness.completeTurnOnSteer) {
                 const completed = { status: 'Completed', turn: { id: expectedTurnId } };
@@ -1243,6 +1246,7 @@ describe('codexRemoteLauncher', () => {
         harness.startTurnParams = [];
         harness.startTurnErrors = [];
         harness.steerTurnCalls = [];
+        harness.steerTurnErrors = [];
         harness.interruptedTurns = [];
         harness.interruptErrors = [];
         harness.rollbackCalls = [];
@@ -1669,10 +1673,10 @@ describe('codexRemoteLauncher', () => {
         ]));
     });
 
-    it('steers a running turn instead of starting a second turn', async () => {
+    it('only steers a running turn for explicit steer delivery', async () => {
         harness.suppressTurnCompletion = true;
         harness.completeTurnOnSteer = true;
-        const { session } = createSessionStub(['first message', 'change direction']);
+        const { session } = createSessionStub(['first message', 'change direction'], { ...createMode(), deliveryMode: 'steer' });
 
         const exitReason = await codexRemoteLauncher(session as never);
 
@@ -1686,10 +1690,42 @@ describe('codexRemoteLauncher', () => {
         expect(session.thinking).toBe(false);
     });
 
+    it('queues ordinary delivery until the active turn completes without steering', async () => {
+        harness.suppressTurnCompletion = true;
+        const mode = { ...createMode(), deliveryMode: 'queue' as const };
+        const { session } = createSessionStub(['first message'], mode, false, false);
+        const launcher = codexRemoteLauncher(session as never);
+        await vi.waitFor(() => expect(harness.startTurnMessages).toEqual(['first message']));
+        session.queue.push('wait for next turn', mode);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(harness.steerTurnCalls).toEqual([]);
+        harness.suppressTurnCompletion = false;
+        harness.dispatchNotification?.('turn/completed', { status: 'Completed', turn: { id: 'turn-1' } });
+        await vi.waitFor(() => expect(harness.startTurnMessages).toEqual(['first message', 'wait for next turn']));
+        session.queue.close();
+        await expect(launcher).resolves.toBe('exit');
+    });
+
+    it('falls back to queue when explicit native steer fails', async () => {
+        harness.suppressTurnCompletion = true;
+        harness.steerTurnErrors.push(new Error('steer rejected'));
+        const mode = { ...createMode(), deliveryMode: 'steer' as const };
+        const { session } = createSessionStub(['first message'], mode, false, false);
+        const launcher = codexRemoteLauncher(session as never);
+        await vi.waitFor(() => expect(harness.startTurnMessages).toEqual(['first message']));
+        session.queue.push('preserve me', mode);
+        await vi.waitFor(() => expect(harness.steerTurnCalls).toHaveLength(1));
+        harness.suppressTurnCompletion = false;
+        harness.dispatchNotification?.('turn/completed', { status: 'Completed', turn: { id: 'turn-1' } });
+        await vi.waitFor(() => expect(harness.startTurnMessages).toEqual(['first message', 'preserve me']));
+        session.queue.close();
+        await expect(launcher).resolves.toBe('exit');
+    });
+
     it('wakes a running turn when guidance arrives after the turn has started', async () => {
         harness.suppressTurnCompletion = true;
         harness.completeTurnOnSteer = true;
-        const mode = createMode();
+        const mode = { ...createMode(), deliveryMode: 'steer' as const };
         const { session } = createSessionStub(['first message'], mode, false, false);
 
         const launcher = codexRemoteLauncher(session as never);

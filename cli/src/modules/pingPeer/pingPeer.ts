@@ -373,7 +373,7 @@ async function sendMessage(
 ): Promise<void> {
     const response = await http.post(
         `${apiUrl}/api/sessions/${encodeURIComponent(sessionId)}/messages`,
-        { text: message },
+        { text: message, deliveryMode: 'queue' },
         {
             headers: authHeaders(jwt),
             timeout: 30_000,

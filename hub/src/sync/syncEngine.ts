@@ -1080,6 +1080,7 @@ export class SyncEngine {
                 text: `[HAPI agent notification] Child session "${childLabel}" (${child.id}) ${outcome}. Use inspect_peer for details if needed.`,
                 localId: `manager-notification:terminal:${claim.managerSessionId}:${child.id}:${claim.terminalState}`,
                 sentFrom: 'webapp',
+                deliveryMode: 'queue',
                 suppressDuplicateDelivery: true
             })
         } catch {

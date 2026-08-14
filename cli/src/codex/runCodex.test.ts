@@ -239,6 +239,18 @@ describe('runCodex', () => {
         expect(harness.bootstrapArgs[0]).not.toHaveProperty('lazy')
     })
 
+    it('preserves deliveryMode on Codex queue items and defaults missing mode to queue', async () => {
+        await runCodexImpl({ workingDirectory: '/tmp/project' })
+        const onUserMessage = harness.session.onUserMessage.mock.calls[0]?.[0] as ((message: unknown, localId?: string) => void)
+        const queue = harness.loopArgs[0]?.messageQueue as { queue: Array<{ mode: { deliveryMode?: string } }> }
+        onUserMessage({ role: 'user', content: { type: 'text', text: 'explicit' }, meta: { deliveryMode: 'steer' } }, 'one')
+        await vi.waitFor(() => expect(queue.queue).toHaveLength(1))
+        expect(queue.queue[0]?.mode.deliveryMode).toBe('steer')
+        onUserMessage({ role: 'user', content: { type: 'text', text: 'ordinary' } }, 'two')
+        await vi.waitFor(() => expect(queue.queue).toHaveLength(2))
+        expect(queue.queue[1]?.mode.deliveryMode).toBe('queue')
+    })
+
     it('replays transcript history when attaching a new Hapi session to an existing Codex thread', async () => {
         await runCodexImpl({
             workingDirectory: '/tmp/project',

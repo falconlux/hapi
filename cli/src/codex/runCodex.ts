@@ -75,7 +75,8 @@ export async function runCodex(opts: {
         collaborationMode: mode.collaborationMode,
         proactiveMultiAgent: mode.proactiveMultiAgent,
         serviceTier: mode.serviceTier,
-        personality: mode.personality
+        personality: mode.personality,
+        deliveryMode: mode.deliveryMode ?? 'queue'
     }));
 
     const codexCliOverrides = parseCodexCliOverrides(opts.codexArgs);
@@ -272,6 +273,7 @@ export async function runCodex(opts: {
 
                 const enhancedMode: EnhancedMode = {
                     permissionMode: messagePermissionMode ?? 'default',
+                    deliveryMode: message.meta?.deliveryMode ?? 'queue',
                     model: currentModel,
                     modelReasoningEffort: currentModelReasoningEffort ?? undefined,
                     collaborationMode: currentCollaborationMode,
@@ -288,6 +290,7 @@ export async function runCodex(opts: {
                 logger.debug('[Codex] Failed to handle user message', error);
                 const enhancedMode: EnhancedMode = {
                     permissionMode: currentPermissionMode ?? 'default',
+                    deliveryMode: message.meta?.deliveryMode ?? 'queue',
                     model: currentModel,
                     modelReasoningEffort: currentModelReasoningEffort ?? undefined,
                     collaborationMode: currentCollaborationMode,
