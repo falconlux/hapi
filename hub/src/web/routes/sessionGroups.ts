@@ -2,6 +2,7 @@ import {
     CreateSessionGroupInputSchema,
     MoveSessionsToGroupInputSchema,
     RenameSessionGroupInputSchema,
+    RenameProjectInputSchema,
     SessionGroupIdSchema,
     SessionGroupProjectKeySchema
 } from '@hapi/protocol/schemas'
@@ -75,6 +76,19 @@ export function createSessionGroupsRoutes(getSyncEngine: () => SyncEngine | null
             if (error instanceof SessionGroupError) {
                 return c.json(errorResponse(error), errorStatus(error))
             }
+            throw error
+        }
+    })
+
+    app.patch('/projects/display-name', async (c) => {
+        const engine = requireSyncEngine(c, getSyncEngine)
+        if (engine instanceof Response) return engine
+        const parsed = RenameProjectInputSchema.safeParse(await c.req.json().catch(() => null))
+        if (!parsed.success) return c.json({ error: 'Invalid body' }, 400)
+        try {
+            return c.json({ project: engine.renameProject(c.get('namespace'), parsed.data.projectKey, parsed.data.name) })
+        } catch (error) {
+            if (error instanceof SessionGroupError) return c.json(errorResponse(error), errorStatus(error))
             throw error
         }
     })

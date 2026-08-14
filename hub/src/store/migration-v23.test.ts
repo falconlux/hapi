@@ -44,7 +44,7 @@ describe('schema migration v22 to current', () => {
         expect(events?.name).toBe('events')
         expect(links?.name).toBe('event_links')
         expect(groups?.name).toBe('session_groups')
-        expect(version.user_version).toBe(24)
+        expect(version.user_version).toBe(25)
         migrated.close()
     })
 })

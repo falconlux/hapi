@@ -8,6 +8,7 @@ export function useSessionGroupActions(api: ApiClient | null): {
     renameGroup: (groupId: string, name: string) => Promise<SessionGroup>
     deleteGroup: (groupId: string) => Promise<void>
     moveSessions: (sessionIds: string[], groupId: string | null) => Promise<void>
+    renameProject: (projectKey: string, name: string) => Promise<void>
     isPending: boolean
 } {
     const queryClient = useQueryClient()
@@ -43,15 +44,24 @@ export function useSessionGroupActions(api: ApiClient | null): {
         },
         onSuccess: () => void invalidate()
     })
+    const renameProjectMutation = useMutation({
+        mutationFn: async ({ projectKey, name }: { projectKey: string; name: string }) => {
+            if (!api) throw new Error('API unavailable')
+            await api.renameProject(projectKey, name)
+        },
+        onSuccess: () => void invalidate()
+    })
 
     return {
         createGroup: async (projectKey, name) => await createMutation.mutateAsync({ projectKey, name }),
         renameGroup: async (groupId, name) => await renameMutation.mutateAsync({ groupId, name }),
         deleteGroup: async (groupId) => await deleteMutation.mutateAsync(groupId),
         moveSessions: async (sessionIds, groupId) => await moveMutation.mutateAsync({ sessionIds, groupId }),
+        renameProject: async (projectKey, name) => await renameProjectMutation.mutateAsync({ projectKey, name }),
         isPending: createMutation.isPending
             || renameMutation.isPending
             || deleteMutation.isPending
             || moveMutation.isPending
+            || renameProjectMutation.isPending
     }
 }

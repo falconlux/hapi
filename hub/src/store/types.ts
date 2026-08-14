@@ -41,6 +41,13 @@ export type StoredSessionGroupMembership = {
     updatedAt: number
 }
 
+export type StoredProjectDisplayName = {
+    namespace: string
+    projectKey: string
+    name: string
+    updatedAt: number
+}
+
 export type StoredMachine = {
     id: string
     namespace: string

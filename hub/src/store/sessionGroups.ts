@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Database } from 'bun:sqlite'
-import type { StoredSessionGroup, StoredSessionGroupMembership } from './types'
+import type { StoredProjectDisplayName, StoredSessionGroup, StoredSessionGroupMembership } from './types'
 
 type SessionGroupRow = {
     id: string
@@ -22,6 +22,51 @@ type SessionGroupMembershipRow = {
 type SessionMetadataRow = {
     id: string
     metadata: string | null
+}
+
+type ProjectDisplayNameRow = {
+    namespace: string
+    project_key: string
+    name: string
+    updated_at: number
+}
+
+export function listProjectDisplayNames(db: Database, namespace: string): StoredProjectDisplayName[] {
+    const rows = db.prepare(`
+        SELECT namespace, project_key, name, updated_at
+        FROM project_display_names
+        WHERE namespace = ?
+        ORDER BY project_key ASC
+    `).all(namespace) as ProjectDisplayNameRow[]
+    return rows.map((row) => ({
+        namespace: row.namespace,
+        projectKey: row.project_key,
+        name: row.name,
+        updatedAt: row.updated_at
+    }))
+}
+
+export function setProjectDisplayName(
+    db: Database,
+    namespace: string,
+    projectKey: string,
+    name: string
+): StoredProjectDisplayName {
+    const projectExists = (db.prepare(
+        'SELECT id, metadata FROM sessions WHERE namespace = ?'
+    ).all(namespace) as SessionMetadataRow[]).some(
+        (row) => projectKeyFromMetadata(row.metadata) === projectKey
+    )
+    if (!projectExists) throw new SessionGroupStoreError('invalid-project', 'Project not found')
+    const updatedAt = Date.now()
+    db.prepare(`
+        INSERT INTO project_display_names (namespace, project_key, name, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(namespace, project_key) DO UPDATE SET
+            name = excluded.name,
+            updated_at = excluded.updated_at
+    `).run(namespace, projectKey, name, updatedAt)
+    return { namespace, projectKey, name, updatedAt }
 }
 
 export type SessionGroupStoreErrorCode = 'not-found' | 'invalid-project'

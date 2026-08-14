@@ -24,6 +24,7 @@ export type {
     StoredSession,
     StoredSessionGroup,
     StoredSessionGroupMembership,
+    StoredProjectDisplayName,
     StoredUser,
     VersionedUpdateResult
 } from './types'
@@ -45,7 +46,7 @@ export {
     WorkGraphValidationError
 } from './workGraph'
 
-const SCHEMA_VERSION: number = 24
+const SCHEMA_VERSION: number = 25
 const REQUIRED_TABLES = [
     'sessions',
     'machines',
@@ -60,7 +61,8 @@ const REQUIRED_TABLES = [
     'events',
     'event_links',
     'session_groups',
-    'session_group_memberships'
+    'session_group_memberships',
+    'project_display_names'
 ] as const
 
 export class Store {
@@ -312,6 +314,7 @@ export class Store {
             21: () => this.migrateFromV21ToV22(),
             22: () => this.migrateFromV22ToV23(),
             23: () => this.migrateFromV23ToV24(),
+            24: () => this.migrateFromV24ToV25(),
         })
 
         if (currentVersion === 0) {
@@ -556,6 +559,7 @@ export class Store {
                 ON event_links(namespace, to_event_id);
         `)
         this.createSessionGroupTables()
+        this.createProjectDisplayNamesTable()
     }
 
     private migrateLegacySchemaIfNeeded(): void {
@@ -985,6 +989,22 @@ export class Store {
 
     private migrateFromV23ToV24(): void {
         this.createSessionGroupTables()
+    }
+
+    private migrateFromV24ToV25(): void {
+        this.createProjectDisplayNamesTable()
+    }
+
+    private createProjectDisplayNamesTable(): void {
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS project_display_names (
+                namespace TEXT NOT NULL,
+                project_key TEXT NOT NULL,
+                name TEXT NOT NULL,
+                updated_at INTEGER NOT NULL,
+                PRIMARY KEY(namespace, project_key)
+            );
+        `)
     }
 
     private createSessionGroupTables(): void {

@@ -20,7 +20,9 @@ export function SessionGroupActionMenu(props: {
     anchorPoint: { x: number; y: number }
     onClose: () => void
     onRename: () => void
-    onDelete: () => void
+    onDelete?: () => void
+    heading?: string
+    renameLabel?: string
 }) {
     const { t } = useTranslation()
     const menuRef = useRef<HTMLDivElement | null>(null)
@@ -109,7 +111,7 @@ export function SessionGroupActionMenu(props: {
             style={style}
         >
             <div id={headingId} className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--app-hint)]">
-                {t('session.group.actions')}
+                {props.heading ?? t('session.group.actions')}
             </div>
             <div role="menu" aria-labelledby={headingId} className="flex flex-col gap-1">
                 <button
@@ -121,19 +123,19 @@ export function SessionGroupActionMenu(props: {
                         props.onRename()
                     }}
                 >
-                    {t('session.group.rename')}
+                    {props.renameLabel ?? t('session.group.rename')}
                 </button>
-                <button
+                {props.onDelete ? <button
                     type="button"
                     role="menuitem"
                     className={`${itemClassName} text-red-500 hover:bg-red-500/10`}
                     onClick={() => {
                         props.onClose()
-                        props.onDelete()
+                        props.onDelete?.()
                     }}
                 >
                     {t('session.group.delete')}
-                </button>
+                </button> : null}
             </div>
         </div>
     )

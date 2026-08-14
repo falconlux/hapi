@@ -29,7 +29,7 @@ describe('session group routes', () => {
         const engine: Partial<SyncEngine> = {
             getSessionGroups: (...args: unknown[]) => {
                 calls.push({ name: 'list', args })
-                return { groups: [group], memberships: [] }
+                return { groups: [group], memberships: [], projects: [] }
             },
             createSessionGroup: (...args: unknown[]) => {
                 calls.push({ name: 'create', args })
@@ -44,6 +44,10 @@ describe('session group routes', () => {
             },
             deleteSessionGroup: (...args: unknown[]) => {
                 calls.push({ name: 'delete', args })
+            },
+            renameProject: (...args: unknown[]) => {
+                calls.push({ name: 'rename-project', args })
+                return { projectKey: '/project/a', name: 'Alpha', updatedAt: 2 }
             }
         }
         const app = createApp(engine)
@@ -64,6 +68,11 @@ describe('session group routes', () => {
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ sessionIds: ['session-1', 'session-2'], groupId })
         })).status).toBe(200)
+        expect((await app.request('/api/projects/display-name', {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ projectKey: '/project/a', name: ' Alpha ' })
+        })).status).toBe(200)
         expect((await app.request(`/api/session-groups/${groupId}`, { method: 'DELETE' })).status).toBe(200)
 
         expect(calls).toEqual([
@@ -71,6 +80,7 @@ describe('session group routes', () => {
             { name: 'create', args: ['alpha', '/project/a', 'Review'] },
             { name: 'rename', args: ['alpha', groupId, 'Renamed'] },
             { name: 'move', args: ['alpha', ['session-1', 'session-2'], groupId] },
+            { name: 'rename-project', args: ['alpha', '/project/a', 'Alpha'] },
             { name: 'delete', args: ['alpha', groupId] }
         ])
     })

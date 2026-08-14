@@ -69,6 +69,14 @@ export type WorktreeMetadata = z.infer<typeof WorktreeMetadataSchema>
 export const SessionGroupIdSchema = z.string().uuid()
 export const SessionGroupNameSchema = z.string().trim().min(1).max(80)
 export const SessionGroupProjectKeySchema = z.string().trim().min(1).max(4096)
+export const ProjectDisplayNameSchema = z.string().trim().min(1).max(80)
+
+export const ProjectDisplayNameEntrySchema = z.object({
+    projectKey: SessionGroupProjectKeySchema,
+    name: ProjectDisplayNameSchema,
+    updatedAt: z.number().int().nonnegative()
+}).strict()
+export type ProjectDisplayNameEntry = z.infer<typeof ProjectDisplayNameEntrySchema>
 
 export const SessionGroupSchema = z.object({
     id: SessionGroupIdSchema,
@@ -89,7 +97,8 @@ export type SessionGroupMembership = z.infer<typeof SessionGroupMembershipSchema
 
 export const SessionGroupsResponseSchema = z.object({
     groups: z.array(SessionGroupSchema),
-    memberships: z.array(SessionGroupMembershipSchema)
+    memberships: z.array(SessionGroupMembershipSchema),
+    projects: z.array(ProjectDisplayNameEntrySchema)
 }).strict()
 export type SessionGroupsResponse = z.infer<typeof SessionGroupsResponseSchema>
 
@@ -100,6 +109,11 @@ export const CreateSessionGroupInputSchema = z.object({
 
 export const RenameSessionGroupInputSchema = z.object({
     name: SessionGroupNameSchema
+}).strict()
+
+export const RenameProjectInputSchema = z.object({
+    projectKey: SessionGroupProjectKeySchema,
+    name: ProjectDisplayNameSchema
 }).strict()
 
 export const MoveSessionsToGroupInputSchema = z.object({

@@ -79,6 +79,25 @@ function renderGroupedList(api: ApiClient = createGroupedApi()) {
 }
 
 describe('SessionList secondary groups', () => {
+    it('uses the persisted project name and exposes rename only through the project long-press menu', async () => {
+        const api = {
+            getSessionGroups: vi.fn().mockResolvedValue({
+                groups: [],
+                memberships: [],
+                projects: [{ projectKey: '/project/a', name: 'Alpha', updatedAt: 1 }]
+            }),
+            renameProject: vi.fn().mockResolvedValue({ project: { projectKey: '/project/a', name: 'Renamed', updatedAt: 2 } })
+        } as unknown as ApiClient
+        renderGroupedList(api)
+        const projectHeader = await screen.findByTitle('/project/a')
+        expect(await screen.findByText('Alpha')).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Rename project' })).not.toBeInTheDocument()
+        fireEvent.contextMenu(projectHeader, { clientX: 100, clientY: 100 })
+        expect(screen.getByRole('menu', { name: 'Project actions' })).toBeInTheDocument()
+        expect(screen.getByRole('menuitem', { name: 'Rename project' })).toBeInTheDocument()
+        expect(screen.queryByRole('menuitem', { name: 'Delete group' })).not.toBeInTheDocument()
+    })
+
     it('renders direct sessions before named groups under the official directory group', async () => {
         const groupId = '11111111-1111-4111-8111-111111111111'
         const api = {

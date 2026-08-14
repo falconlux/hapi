@@ -34,6 +34,7 @@ describe('session group schemas', () => {
         expect(SessionGroupsResponseSchema.safeParse({
             groups: [],
             memberships: [],
+            projects: [],
             extra: true
         }).success).toBe(false)
         expect(SyncEventSchema.parse({

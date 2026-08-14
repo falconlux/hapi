@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ApiClient } from '@/api/client'
-import type { SessionGroup, SessionGroupMembership } from '@/types/api'
+import type { ProjectDisplayNameEntry, SessionGroup, SessionGroupMembership } from '@hapi/protocol/schemas'
 import { queryKeys } from '@/lib/query-keys'
 
 export function useSessionGroups(api: ApiClient | null): {
     groups: SessionGroup[]
     memberships: SessionGroupMembership[]
+    projects: ProjectDisplayNameEntry[]
     isLoading: boolean
     error: string | null
 } {
@@ -13,7 +14,7 @@ export function useSessionGroups(api: ApiClient | null): {
         queryKey: queryKeys.sessionGroups,
         queryFn: async () => {
             if (!api || typeof api.getSessionGroups !== 'function') {
-                return { groups: [], memberships: [] }
+                return { groups: [], memberships: [], projects: [] }
             }
             return await api.getSessionGroups()
         },
@@ -23,6 +24,7 @@ export function useSessionGroups(api: ApiClient | null): {
     return {
         groups: query.data?.groups ?? [],
         memberships: query.data?.memberships ?? [],
+        projects: query.data?.projects ?? [],
         isLoading: query.isLoading,
         error: query.error instanceof Error
             ? query.error.message

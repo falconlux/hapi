@@ -1,12 +1,14 @@
 import type { Database } from 'bun:sqlite'
-import type { StoredSessionGroup, StoredSessionGroupMembership } from './types'
+import type { StoredProjectDisplayName, StoredSessionGroup, StoredSessionGroupMembership } from './types'
 import {
     createSessionGroup,
     deleteSessionGroup,
     getSessionGroup,
     listSessionGroupMemberships,
     listSessionGroups,
+    listProjectDisplayNames,
     renameSessionGroup,
+    setProjectDisplayName,
     setSessionGroupMemberships
 } from './sessionGroups'
 
@@ -16,6 +18,14 @@ export class SessionGroupStore {
 
     list(namespace: string, projectKey?: string): StoredSessionGroup[] {
         return listSessionGroups(this.db, namespace, projectKey)
+    }
+
+    listProjectDisplayNames(namespace: string): StoredProjectDisplayName[] {
+        return listProjectDisplayNames(this.db, namespace)
+    }
+
+    setProjectDisplayName(namespace: string, projectKey: string, name: string): StoredProjectDisplayName {
+        return setProjectDisplayName(this.db, namespace, projectKey, name)
     }
 
     listMemberships(namespace: string, projectKey?: string): StoredSessionGroupMembership[] {

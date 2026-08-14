@@ -27,7 +27,22 @@ export class SessionGroupService {
                 groupId: membership.groupId,
                 projectKey: membership.projectKey,
                 updatedAt: membership.updatedAt
+            })),
+            projects: this.store.listProjectDisplayNames(namespace).map((project) => ({
+                projectKey: project.projectKey,
+                name: project.name,
+                updatedAt: project.updatedAt
             }))
+        }
+    }
+
+    renameProject(namespace: string, projectKey: string, name: string) {
+        try {
+            const project = this.store.setProjectDisplayName(namespace, projectKey, name)
+            this.publish(namespace)
+            return { projectKey: project.projectKey, name: project.name, updatedAt: project.updatedAt }
+        } catch (error) {
+            throw this.mapStoreError(error)
         }
     }
 

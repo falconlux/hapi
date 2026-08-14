@@ -332,6 +332,10 @@ export class SyncEngine {
         return this.sessionGroupService.rename(namespace, groupId, name)
     }
 
+    renameProject(namespace: string, projectKey: string, name: string) {
+        return this.sessionGroupService.renameProject(namespace, projectKey, name)
+    }
+
     deleteSessionGroup(namespace: string, groupId: string): void {
         this.sessionGroupService.delete(namespace, groupId)
     }

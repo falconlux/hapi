@@ -46,7 +46,7 @@ describe('Store V16->V24 migration: usage index ladder', () => {
             )
             const version = internalDb.prepare('PRAGMA user_version').get() as { user_version: number }
 
-            expect(version.user_version).toBe(24)
+            expect(version.user_version).toBe(25)
             expect(tableNames).toContain('usage_events')
             expect(tableNames).toContain('usage_scan_state')
             expect(tableNames).toContain('events')

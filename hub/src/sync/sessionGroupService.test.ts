@@ -35,6 +35,16 @@ function createSession(
 }
 
 describe('SessionGroupService', () => {
+    it('persists project display names without changing project keys and isolates namespaces', () => {
+        const { store, service } = createHarness()
+        createSession(store, 'alpha-project', 'alpha', '/project/a')
+        createSession(store, 'beta-project', 'beta', '/project/a')
+        expect(service.renameProject('alpha', '/project/a', 'Alpha')).toMatchObject({ projectKey: '/project/a', name: 'Alpha' })
+        expect(service.list('alpha').projects).toEqual([expect.objectContaining({ projectKey: '/project/a', name: 'Alpha' })])
+        expect(service.list('beta').projects).toEqual([])
+        store.close()
+    })
+
     it('isolates groups and memberships by namespace and projectKey', () => {
         const { store, service } = createHarness()
         const alpha = createSession(store, 'alpha-a', 'alpha', '/worktree/a', '/project/a')
@@ -48,9 +58,10 @@ describe('SessionGroupService', () => {
 
         expect(service.list('alpha')).toEqual({
             groups: [alphaGroup],
-            memberships: [expect.objectContaining({ sessionId: alpha.id, groupId: alphaGroup.id, projectKey: '/project/a' })]
+            memberships: [expect.objectContaining({ sessionId: alpha.id, groupId: alphaGroup.id, projectKey: '/project/a' })],
+            projects: []
         })
-        expect(service.list('alpha', '/project/b')).toEqual({ groups: [], memberships: [] })
+        expect(service.list('alpha', '/project/b')).toEqual({ groups: [], memberships: [], projects: [] })
         expect(() => service.moveSessions('alpha', [alphaOther.id], alphaGroup.id)).toThrow(SessionGroupError)
         expect(() => service.moveSessions('alpha', [beta.id], alphaGroup.id)).toThrow(SessionGroupError)
         store.close()
@@ -65,7 +76,7 @@ describe('SessionGroupService', () => {
         service.delete('alpha', group.id)
 
         expect(store.sessions.getSessionByNamespace(session.id, 'alpha')?.id).toBe(session.id)
-        expect(service.list('alpha')).toEqual({ groups: [], memberships: [] })
+        expect(service.list('alpha')).toEqual({ groups: [], memberships: [], projects: [] })
         store.close()
     })
 

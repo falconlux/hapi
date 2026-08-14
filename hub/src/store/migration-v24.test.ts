@@ -57,7 +57,7 @@ describe('schema migration v23 to v24', () => {
         store.close()
 
         const { version, tables } = inspect(dbPath)
-        expect(version).toBe(24)
+        expect(version).toBe(25)
         expect(tables).toContain('session_groups')
         expect(tables).toContain('session_group_memberships')
     })
@@ -94,19 +94,19 @@ describe('schema migration v23 to v24', () => {
         store.close()
 
         const { version, tables } = inspect(dbPath)
-        expect(version).toBe(24)
+        expect(version).toBe(25)
         expect(tables).toContain('events')
         expect(tables).toContain('event_links')
         expect(tables).toContain('session_groups')
         expect(tables).toContain('session_group_memberships')
     })
 
-    it('creates a fresh schema directly at v24', () => {
+    it('creates a fresh schema directly at v25', () => {
         const dbPath = makeDbPath('empty')
         new Store(dbPath).close()
 
         const { version, tables } = inspect(dbPath)
-        expect(version).toBe(24)
+        expect(version).toBe(25)
         expect(tables).toContain('sessions')
         expect(tables).toContain('messages')
         expect(tables).toContain('session_groups')

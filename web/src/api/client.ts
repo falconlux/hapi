@@ -273,6 +273,13 @@ export class ApiClient {
         )
     }
 
+    async renameProject(projectKey: string, name: string): Promise<{ project: { projectKey: string; name: string; updatedAt: number } }> {
+        return await this.request('/api/projects/display-name', {
+            method: 'PATCH',
+            body: JSON.stringify({ projectKey, name })
+        })
+    }
+
     async deleteSessionGroup(groupId: string): Promise<void> {
         await this.request(`/api/session-groups/${encodeURIComponent(groupId)}`, {
             method: 'DELETE'

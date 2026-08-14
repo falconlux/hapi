@@ -575,6 +575,33 @@ function SecondaryGroupHeader(props: {
     )
 }
 
+function ProjectHeader(props: {
+    group: SessionGroup
+    actionsEnabled: boolean
+    onToggle: () => void
+    onOpenActions: (point: { x: number; y: number }) => void
+    children: React.ReactNode
+}) {
+    const longPressHandlers = useLongPress({
+        interaction: 'touch-only-native-click',
+        threshold: 500,
+        longPressEnabled: props.actionsEnabled,
+        contextMenuEnabled: props.actionsEnabled,
+        onClick: props.onToggle,
+        onLongPress: props.onOpenActions
+    })
+    return (
+        <div
+            {...longPressHandlers}
+            className="group/project sticky top-0 z-10 flex items-center gap-2 bg-[var(--app-bg)] py-1.5 pl-2 pr-2 text-left rounded-lg transition-colors hover:bg-[var(--app-secondary-bg)] cursor-pointer min-w-0 w-full select-none"
+            title={props.group.directory}
+            style={{ WebkitTouchCallout: 'none' }}
+        >
+            {props.children}
+        </div>
+    )
+}
+
 function SessionPreviewArrowIcon(props: { direction: 'up' | 'down'; className?: string }) {
     return (
         <svg
@@ -1257,6 +1284,8 @@ export function SessionList(props: {
         group: CustomSessionGroup
         anchorPoint: { x: number; y: number }
     } | null>(null)
+    const [projectActionMenu, setProjectActionMenu] = useState<{ projectKey: string; anchorPoint: { x: number; y: number } } | null>(null)
+    const [renameProjectKey, setRenameProjectKey] = useState<string | null>(null)
     const showDetailedStatus = sessionListStatusMode === 'detailed'
     const [searchQuery, setSearchQuery] = useState('')
     const [searchExpanded, setSearchExpanded] = useState(false)
@@ -1283,6 +1312,10 @@ export function SessionList(props: {
         }
         return groups
     }, [sessionGroupsQuery.groups])
+    const projectDisplayNames = useMemo(
+        () => new Map(sessionGroupsQuery.projects.map((project) => [project.projectKey, project.name])),
+        [sessionGroupsQuery.projects]
+    )
 
     useEffect(() => {
         // 中文注释：监听导入标记变化，让列表在“导入完成”或“用户已在 Hapi 中继续会话”后立即刷新时间文案。
@@ -1554,9 +1587,10 @@ export function SessionList(props: {
         const canStartInGroupDirectory = group.directory !== 'Other'
         // With multiple machines in the unfiltered view, disambiguate
         // same-named directories by suffixing the machine label.
+        const displayName = projectDisplayNames.get(group.directory) ?? group.displayName
         const groupTitle = showMachineFilterBar && activeMachineFilter === null
-            ? `${group.displayName} · ${resolveMachineLabel(group.machineId)}`
-            : group.displayName
+            ? `${displayName} · ${resolveMachineLabel(group.machineId)}`
+            : displayName
         const secondaryGroups = buildSecondarySessionGroups(
             group.directory,
             group.sessions,
@@ -1574,10 +1608,11 @@ export function SessionList(props: {
         )
         return (
             <div key={group.key}>
-                <div
-                    className="group/project sticky top-0 z-10 flex items-center gap-2 bg-[var(--app-bg)] py-1.5 pl-2 pr-2 text-left rounded-lg transition-colors hover:bg-[var(--app-secondary-bg)] cursor-pointer min-w-0 w-full select-none"
-                    onClick={() => toggleGroup(group.key, isCollapsed)}
-                    title={group.directory}
+                <ProjectHeader
+                    group={group}
+                    actionsEnabled={canStartInGroupDirectory}
+                    onToggle={() => toggleGroup(group.key, isCollapsed)}
+                    onOpenActions={(anchorPoint) => setProjectActionMenu({ projectKey: group.directory, anchorPoint })}
                 >
                     <ChevronIcon className="h-3.5 w-3.5 text-[var(--app-hint)] shrink-0" collapsed={isCollapsed} />
                     <span className="font-medium text-sm truncate flex-1">
@@ -1625,7 +1660,7 @@ export function SessionList(props: {
                     <span className="text-[11px] tabular-nums text-[var(--app-hint)] shrink-0">
                         ({group.sessions.length})
                     </span>
-                </div>
+                </ProjectHeader>
 
                 {/* Secondary session groups */}
                 <div className="collapsible-panel" data-open={!isCollapsed || undefined}>
@@ -2236,6 +2271,26 @@ export function SessionList(props: {
                     onClose={() => setGroupActionMenu(null)}
                     onRename={() => setRenameGroup(groupActionMenu.group)}
                     onDelete={() => setDeleteGroup(groupActionMenu.group)}
+                />
+            ) : null}
+            {projectActionMenu ? (
+                <SessionGroupActionMenu
+                    isOpen={true}
+                    anchorPoint={projectActionMenu.anchorPoint}
+                    onClose={() => setProjectActionMenu(null)}
+                    onRename={() => setRenameProjectKey(projectActionMenu.projectKey)}
+                    heading={t('project.actions')}
+                    renameLabel={t('project.rename')}
+                />
+            ) : null}
+            {renameProjectKey ? (
+                <SessionGroupNameDialog
+                    isOpen={true}
+                    title={t('project.renameTitle')}
+                    initialName={projectDisplayNames.get(renameProjectKey) ?? getGroupDisplayName(renameProjectKey)}
+                    onClose={() => setRenameProjectKey(null)}
+                    onSubmit={async (name) => sessionGroupActions.renameProject(renameProjectKey, name)}
+                    isPending={sessionGroupActions.isPending}
                 />
             ) : null}
             {renameGroup ? (
