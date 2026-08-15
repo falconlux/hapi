@@ -1,13 +1,13 @@
 {
-  "version": "0.27.2+7",
-  "displayVersion": "0.27.2.7",
-  "commit": "97b717ea33bbeefda9e17baa53810f752d7062c8",
+  "version": "0.27.2+8",
+  "displayVersion": "0.27.2.8",
+  "commit": "d5f0198bc28b1243f90d4728ffa8851ed398f224",
   "schemaVersion": 25,
-  "deployId": "0.27.2+7-97b717ea-20260814-182124",
-  "deployedAt": "2026-08-14T18:21:28+08:00",
-  "webCommit": "97b717ea33bbeefda9e17baa53810f752d7062c8",
-  "webDeployedAt": "2026-08-14T18:21:28+08:00",
-  "webDeployId": "0.27.2+7-97b717ea-20260814-182124-web",
-  "rollbackDeployId": "0.27.2+6-45b1c3a6-20260814-133632",
-  "rollbackPath": "/home/ubuntu/hapi-custom/backups/0.27.2+7-97b717ea-20260814-182124"
+  "deployId": "0.27.2+8-d5f0198b-20260815-113244",
+  "deployedAt": "2026-08-15T11:32:44+08:00",
+  "webCommit": "d5f0198bc28b1243f90d4728ffa8851ed398f224",
+  "webDeployedAt": "2026-08-15T11:32:44+08:00",
+  "webDeployId": "0.27.2+8-d5f0198b-20260815-113244-web",
+  "rollbackDeployId": "0.27.2+7-97b717ea-20260814-182124",
+  "rollbackPath": "/home/ubuntu/hapi-custom/backups/0.27.2+8-d5f0198b-20260815-113244"
 }
