@@ -182,6 +182,22 @@ export function computeCanCancel({
     return hasServerEcho && !isPending
 }
 
+/** @internal Exported for unit testing. */
+export function computeCanSteerQueuedMessages({
+    flavor,
+    active,
+    thinking,
+    controlledByUser,
+}: {
+    flavor: string | null
+    active: boolean
+    thinking: boolean
+    controlledByUser: boolean
+}): boolean {
+    const supported = flavor === 'pi' || (flavor === 'codex' && active)
+    return supported && thinking && !controlledByUser
+}
+
 /**
  * Floating bar above the composer showing queued (pending invocation) messages.
  * Each item has an edit button (✎) and a cancel button (✕).
@@ -196,6 +212,7 @@ export function QueuedMessagesBar({
     pendingScheduleRevision,
     onEdit,
     canSteer,
+    showSteerLabel,
 }: {
     sessionId: string
     api: ApiClient | null
@@ -211,10 +228,12 @@ export function QueuedMessagesBar({
     onEdit?: (params: { text: string; pendingSchedule: PendingSchedule | null }) => void
     /**
      * When true, each queued row gets a Steer button that delivers that
-     * message into the active turn (Pi native steer). The parent computes it
-     * as: pi flavor && session thinking && remote-controlled.
+     * message into the active Pi or Codex turn. The parent gates supported
+     * flavor, active thinking state, and remote control.
      */
     canSteer?: boolean
+    /** Show the explicit Codex guidance label; Pi keeps its existing icon-only control. */
+    showSteerLabel?: boolean
 }) {
     const queued = useQueuedMessages(sessionId)
     const assistantApi = useAui()
@@ -366,7 +385,7 @@ export function QueuedMessagesBar({
                             })
                         }
 
-                        // Steer delivers this message into the active Pi turn. Gated
+                        // Steer delivers this message into the active Pi/Codex turn. Gated
                         // on the same server-echo + no-pending-op conditions as
                         // Edit/Cancel, and never offered for future-scheduled rows
                         // (the hub rejects those).
@@ -512,9 +531,10 @@ export function QueuedMessagesBar({
                                             disabled={steerPending}
                                             onClick={handleSteer}
                                             onMouseDown={(e) => e.preventDefault()}
-                                            className="flex h-6 w-6 items-center justify-center rounded text-[var(--app-hint)] transition-colors hover:bg-[var(--app-border)] hover:text-[var(--app-fg)] disabled:cursor-not-allowed disabled:opacity-40"
+                                            className={`flex h-6 items-center justify-center gap-1 rounded px-1.5 text-[var(--app-hint)] transition-colors hover:bg-[var(--app-border)] hover:text-[var(--app-fg)] disabled:cursor-not-allowed disabled:opacity-40 ${showSteerLabel ? '' : 'w-6'}`}
                                         >
                                             <SteerIcon />
+                                            {showSteerLabel ? <span>{t('queuedMessages.steerShort')}</span> : null}
                                         </button>
                                     ) : null}
                                     <button

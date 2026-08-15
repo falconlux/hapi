@@ -6,6 +6,7 @@ import type { DecryptedMessage } from '@/types/api'
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import {
     computeCanCancel,
+    computeCanSteerQueuedMessages,
     computeEditPendingSchedule,
     getQueuedMessageEditText,
     getQueuedMessagePreview,
@@ -91,6 +92,7 @@ function renderQueuedMessage(
     pendingScheduleRevision = 0,
     canSteer = false,
     api: ApiClient | null = null,
+    showSteerLabel = false,
 ) {
     const onEdit = vi.fn()
     let currentPendingScheduleRevision = pendingScheduleRevision
@@ -109,6 +111,7 @@ function renderQueuedMessage(
                 pendingScheduleRevision={currentPendingScheduleRevision}
                 onEdit={onEdit}
                 canSteer={canSteer}
+                showSteerLabel={showSteerLabel}
             />
         </QueryClientProvider>
     )
@@ -126,6 +129,7 @@ function renderQueuedMessage(
                         pendingScheduleRevision={currentPendingScheduleRevision}
                         onEdit={onEdit}
                         canSteer={canSteer}
+                        showSteerLabel={showSteerLabel}
                     />
                 </QueryClientProvider>
             )
@@ -725,6 +729,14 @@ describe('formatScheduledTime', () => {
 })
 
 describe('QueuedMessagesBar steer action', () => {
+    it('allows Pi thinking and Codex active thinking, but not inactive or user-controlled Codex', () => {
+        expect(computeCanSteerQueuedMessages({ flavor: 'pi', active: true, thinking: true, controlledByUser: false })).toBe(true)
+        expect(computeCanSteerQueuedMessages({ flavor: 'codex', active: true, thinking: true, controlledByUser: false })).toBe(true)
+        expect(computeCanSteerQueuedMessages({ flavor: 'codex', active: true, thinking: false, controlledByUser: false })).toBe(false)
+        expect(computeCanSteerQueuedMessages({ flavor: 'codex', active: false, thinking: true, controlledByUser: false })).toBe(false)
+        expect(computeCanSteerQueuedMessages({ flavor: 'codex', active: true, thinking: true, controlledByUser: true })).toBe(false)
+    })
+
     // The real useSteerQueuedMessage hook runs here (only the cancel hook is
     // module-mocked); pass a fake api whose steerMessage resolves on demand.
     function renderSteerable(canSteer = true) {
@@ -743,6 +755,16 @@ describe('QueuedMessagesBar steer action', () => {
 
         renderSteerable(false)
         expect(screen.queryByRole('button', { name: 'Steer queued message' })).toBeNull()
+    })
+
+    it('shows an explicit Codex guidance label without changing the Pi icon-only path', () => {
+        const api = { steerMessage: mocks.steerMessage } as unknown as ApiClient
+        const codex = renderQueuedMessage(null, null, 0, true, api, true)
+        expect(screen.getByText('queuedMessages.steerShort')).toBeTruthy()
+        codex.unmount()
+
+        renderQueuedMessage(null, null, 0, true, api, false)
+        expect(screen.queryByText('queuedMessages.steerShort')).toBeNull()
     })
 
     it('hides the Steer button on future-scheduled rows', () => {

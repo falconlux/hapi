@@ -251,6 +251,32 @@ describe('runCodex', () => {
         expect(queue.queue[1]?.mode.deliveryMode).toBe('queue')
     })
 
+    it('steers the exact queued localId with the complete item and preserves sibling order', async () => {
+        await runCodexImpl({ workingDirectory: '/tmp/project' })
+        const onUserMessage = harness.session.onUserMessage.mock.calls[0]?.[0] as ((message: unknown, localId?: string) => void)
+        const queue = harness.loopArgs[0]?.messageQueue as { queue: Array<{ message: string; localId?: string; mode: { deliveryMode?: string } }> }
+        onUserMessage({ role: 'user', content: { type: 'text', text: 'before' } }, 'before-id')
+        onUserMessage({ role: 'user', content: { type: 'text', text: 'target' }, meta: { deliveryMode: 'queue' } }, 'target-id')
+        onUserMessage({ role: 'user', content: { type: 'text', text: 'after' } }, 'after-id')
+        await vi.waitFor(() => expect(queue.queue).toHaveLength(3))
+
+        const registration = harness.session.rpcHandlerManager.registerHandler.mock.calls.find(
+            ([method]) => method === RPC_METHODS.SteerQueuedMessage
+        )
+        const handler = registration?.[1] as ((payload: unknown) => Promise<unknown>) | undefined
+
+        await expect(handler?.({ localId: 'target-id' })).resolves.toEqual({ steered: true })
+        expect(queue.queue.map((item) => [item.message, item.localId, item.mode.deliveryMode])).toEqual([
+            ['target', 'target-id', 'steer'],
+            ['before', 'before-id', 'queue'],
+            ['after', 'after-id', 'queue'],
+        ])
+        await expect(handler?.({ localId: 'missing-id' })).resolves.toEqual({
+            steered: false,
+            error: 'Message not found or already dispatched',
+        })
+    })
+
     it('replays transcript history when attaching a new Hapi session to an existing Codex thread', async () => {
         await runCodexImpl({
             workingDirectory: '/tmp/project',

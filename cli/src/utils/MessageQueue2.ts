@@ -1,6 +1,6 @@
 import { logger } from "@/ui/logger";
 
-interface QueueItem<T> {
+export interface QueueItem<T> {
     message: string;
     mode: T;
     modeHash: string;
@@ -262,11 +262,31 @@ export class MessageQueue2<T> {
      * may already have been collected for invocation and won't be found here.
      */
     cancelByLocalId(localId: string): boolean {
-        if (!localId) return false;
+        return this.removeByLocalId(localId) !== null;
+    }
+
+    /** Remove and return the complete queued item matching localId. */
+    removeByLocalId(localId: string): QueueItem<T> | null {
+        if (!localId) return null;
         const idx = this.queue.findIndex(item => item.localId === localId);
-        if (idx === -1) return false;
-        this.queue.splice(idx, 1);
-        return true;
+        if (idx === -1) return null;
+        return this.queue.splice(idx, 1)[0] ?? null;
+    }
+
+    /** Reinsert a complete item at the head without dropping item metadata. */
+    unshiftItem(item: QueueItem<T>): void {
+        if (this.closed) {
+            throw new Error('Cannot unshift to closed queue');
+        }
+        this.queue.unshift(item);
+        if (this.onMessageHandler) {
+            this.onMessageHandler(item.message, item.mode);
+        }
+        if (this.waiter) {
+            const waiter = this.waiter;
+            this.waiter = null;
+            waiter(true);
+        }
     }
 
     /**

@@ -48,7 +48,7 @@ describe('SyncEngine.steerQueuedMessage', () => {
         }
     })
 
-    it('rejects non-pi sessions without invoking the CLI', async () => {
+    it('allows Codex sessions and invokes the CLI with the exact localId', async () => {
         const { store, engine } = createEngine()
         try {
             const session = engine.getOrCreateSession(
@@ -59,11 +59,40 @@ describe('SyncEngine.steerQueuedMessage', () => {
             )
             const message = store.messages.addMessage(session.id, { text: 'hi' }, 'local-id')
 
+            const calls: Array<[string, string]> = []
+            ;(engine as unknown as { rpcGateway: { steerQueuedMessage: (sessionId: string, localId: string) => Promise<{ steered: boolean }> } }).rpcGateway.steerQueuedMessage = async (sessionId, localId) => {
+                calls.push([sessionId, localId])
+                return { steered: true }
+            }
+
+            const result = await engine.steerQueuedMessage(session.id, message.id)
+
+            expect(result).toEqual({
+                status: 'steered',
+                localId: 'local-id'
+            })
+            expect(calls).toEqual([[session.id, 'local-id']])
+        } finally {
+            engine.stop()
+        }
+    })
+
+    it('rejects unsupported flavors without invoking the CLI', async () => {
+        const { store, engine } = createEngine()
+        try {
+            const session = engine.getOrCreateSession(
+                'steer-claude',
+                { path: '/tmp/project', host: 'localhost', flavor: 'claude' },
+                { requests: {}, completedRequests: {} },
+                'default'
+            )
+            const message = store.messages.addMessage(session.id, { text: 'hi' }, 'local-id')
+
             const result = await engine.steerQueuedMessage(session.id, message.id)
 
             expect(result).toEqual({
                 status: 'failed',
-                error: 'Steering is only supported for Pi sessions',
+                error: 'Steering is not supported for this session flavor',
                 localId: null
             })
         } finally {

@@ -660,6 +660,7 @@ export default {
   'queuedMessages.editAlreadyInvoked': '消息已发送，无法编辑',
   'queuedMessages.editCurrentDraftKept': '队列消息已取消，已保留当前草稿和定时设置。',
   'queuedMessages.steer': '立即插入当前回合',
+  'queuedMessages.steerShort': '引导',
   'queuedMessages.steerFailed': '插入失败，消息仍在队列中',
 
   // Scratchlist (per-session workbench, issue #11)

@@ -1123,9 +1123,8 @@ export class SyncEngine {
     }
 
     /**
-     * Ask the CLI to deliver one waiting-queue message into the active Pi turn
-     * (Pi native steer). Only pi sessions support this today; the CLI's
-     * `steer-queued-message` handler is registered by the pi runner alone.
+     * Ask the CLI to deliver one waiting-queue message into the active turn.
+     * Pi and Codex provide native steer handlers; every other flavor fails closed.
      */
     async steerQueuedMessage(
         sessionId: string,
@@ -1135,8 +1134,9 @@ export class SyncEngine {
         if (!session) {
             return { status: 'failed', error: 'Session not found', localId: null }
         }
-        if (session.metadata?.flavor !== 'pi') {
-            return { status: 'failed', error: 'Steering is only supported for Pi sessions', localId: null }
+        const flavor = session.metadata?.flavor
+        if (flavor !== 'pi' && flavor !== 'codex') {
+            return { status: 'failed', error: 'Steering is not supported for this session flavor', localId: null }
         }
         if (session.agentState?.controlledByUser === true) {
             return { status: 'failed', error: 'Steering is only available for remote sessions', localId: null }

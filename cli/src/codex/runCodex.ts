@@ -311,6 +311,27 @@ export async function runCodex(opts: {
         return removed;
     });
 
+    session.rpcHandlerManager.registerHandler(RPC_METHODS.SteerQueuedMessage, async (payload: unknown) => {
+        const localId = payload && typeof payload === 'object'
+            && typeof (payload as { localId?: unknown }).localId === 'string'
+            ? (payload as { localId: string }).localId
+            : undefined;
+        if (!localId) {
+            return { steered: false, error: 'localId is required' };
+        }
+        const item = messageQueue.removeByLocalId(localId);
+        if (!item) {
+            return { steered: false, error: 'Message not found or already dispatched' };
+        }
+        const mode = { ...item.mode, deliveryMode: 'steer' as const };
+        messageQueue.unshiftItem({
+            ...item,
+            mode,
+            modeHash: messageQueue.modeHasher(mode)
+        });
+        return { steered: true };
+    });
+
     const formatFailureReason = (message: string): string => {
         const maxLength = 200;
         if (message.length <= maxLength) {

@@ -36,7 +36,7 @@ import { codexModelAdvertisesFastTier, getEffectiveCodexServiceTier } from '@/co
 import type { PendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import { resolvePendingSchedule } from '@/components/AssistantChat/ScheduleTimePicker'
 import { HappyThread } from '@/components/AssistantChat/HappyThread'
-import { QueuedMessagesBar } from '@/components/AssistantChat/QueuedMessagesBar'
+import { computeCanSteerQueuedMessages, QueuedMessagesBar } from '@/components/AssistantChat/QueuedMessagesBar'
 import { ScratchlistDrawer } from '@/components/AssistantChat/ScratchlistPanel'
 import { useHubScratchlist } from '@/lib/use-hub-scratchlist'
 import { useSessions } from '@/hooks/queries/useSessions'
@@ -1746,7 +1746,13 @@ function SessionChatInner(props: SessionChatProps) {
                                     // Restore the schedule so the clock button re-activates
                                     updatePendingSchedule(restored)
                                 }}
-                                canSteer={agentFlavor === 'pi' && props.session.thinking && !controlledByUser}
+                                canSteer={computeCanSteerQueuedMessages({
+                                    flavor: agentFlavor,
+                                    active: props.session.active,
+                                    thinking: props.session.thinking,
+                                    controlledByUser,
+                                })}
+                                showSteerLabel={agentFlavor === 'codex'}
                             />
                         </div>
 

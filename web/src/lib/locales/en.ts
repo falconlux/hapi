@@ -661,6 +661,7 @@ export default {
   'queuedMessages.editAlreadyInvoked': "Message already sent — it can't be edited",
   'queuedMessages.editCurrentDraftKept': 'Queued message cancelled — current draft and schedule were kept.',
   'queuedMessages.steer': 'Deliver into the running turn now',
+  'queuedMessages.steerShort': 'Steer',
   'queuedMessages.steerFailed': 'Steer failed — message stays queued',
 
   // Scratchlist (per-session workbench, issue #11)

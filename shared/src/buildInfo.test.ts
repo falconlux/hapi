@@ -4,6 +4,6 @@ import { APP_VERSION } from './buildInfo'
 // This is the user-visible Web version injected by web/vite.config.ts.
 describe('APP_VERSION', () => {
     it('matches the seventh 0.27.2 custom release', () => {
-        expect(APP_VERSION).toBe('0.27.2.7')
+        expect(APP_VERSION).toBe('0.27.2.8')
     })
 })
