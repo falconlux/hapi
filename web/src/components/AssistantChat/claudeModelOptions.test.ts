@@ -9,6 +9,7 @@ describe('getClaudeComposerModelOptions', () => {
         expect(options).toContainEqual({ value: 'claude-fable-5', label: 'Fable 5' })
         expect(options).toContainEqual({ value: 'claude-opus-4-8', label: 'Opus 4.8' })
         expect(options).toContainEqual({ value: 'claude-opus-5', label: 'Opus 5' })
+        expect(options).toContainEqual({ value: 'claude-opus-5[1m]', label: 'Opus 5 1M' })
     })
 
     it('does not duplicate preset Claude models', () => {

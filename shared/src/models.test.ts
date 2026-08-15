@@ -37,6 +37,7 @@ describe('getClaudeModelLabel', () => {
         expect(getClaudeModelLabel('claude-opus-4-7')).toBe('Opus 4.7')
         expect(getClaudeModelLabel('claude-opus-4-8')).toBe('Opus 4.8')
         expect(getClaudeModelLabel('claude-opus-5')).toBe('Opus 5')
+        expect(getClaudeModelLabel('claude-opus-5[1m]')).toBe('Opus 5 1M')
     })
 
     test('trims whitespace before lookup', () => {

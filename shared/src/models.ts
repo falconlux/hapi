@@ -12,6 +12,7 @@ export const CLAUDE_MODEL_LABELS = {
     'claude-opus-4-8': 'Opus 4.8',
     'claude-opus-4-8[1m]': 'Opus 4.8 1M',
     'claude-opus-5': 'Opus 5',
+    'claude-opus-5[1m]': 'Opus 5 1M',
     fable: 'Fable',
     'fable[1m]': 'Fable 1M'
 } as const

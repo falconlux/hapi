@@ -12,6 +12,7 @@ describe('getContextBudgetTokens', () => {
 
     it('uses the large budget for a full Claude model name carrying a [1m] suffix', () => {
         expect(getContextBudgetTokens('claude-opus-4-8[1m]', 'claude')).toBe(990_000)
+        expect(getContextBudgetTokens('claude-opus-5[1m]', 'claude')).toBe(990_000)
     })
 
     it('uses the large budget for Fable even under its bare id (1M window)', () => {
