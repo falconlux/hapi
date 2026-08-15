@@ -1699,11 +1699,52 @@ describe('codexRemoteLauncher', () => {
         session.queue.push('wait for next turn', mode);
         await new Promise((resolve) => setTimeout(resolve, 20));
         expect(harness.steerTurnCalls).toEqual([]);
+        expect(session.queue.size()).toBe(1);
         harness.suppressTurnCompletion = false;
         harness.dispatchNotification?.('turn/completed', { status: 'Completed', turn: { id: 'turn-1' } });
         await vi.waitFor(() => expect(harness.startTurnMessages).toEqual(['first message', 'wait for next turn']));
         session.queue.close();
         await expect(launcher).resolves.toBe('exit');
+    });
+
+    it('steers one upgraded non-head item while adjacent ordinary messages remain queued', async () => {
+        harness.suppressTurnCompletion = true;
+        const queueMode = { ...createMode(), deliveryMode: 'queue' as const };
+        const { session } = createSessionStub(['first message'], queueMode, false, false);
+        const launcher = codexRemoteLauncher(session as never);
+        await vi.waitFor(() => expect(harness.startTurnMessages).toEqual(['first message']));
+
+        session.queue.push('before', queueMode, 'before-id');
+        session.queue.push('target', queueMode, 'target-id');
+        session.queue.push('after', queueMode, 'after-id');
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(session.queue.size()).toBe(3);
+
+        const target = session.queue.removeByLocalId('target-id');
+        expect(target).not.toBeNull();
+        const steerMode = { ...target!.mode, deliveryMode: 'steer' as const };
+        session.queue.unshiftItem({
+            ...target!,
+            mode: steerMode,
+            modeHash: session.queue.modeHasher(steerMode)
+        });
+
+        await vi.waitFor(() => expect(harness.steerTurnCalls).toEqual([{
+            threadId: 'thread-1',
+            expectedTurnId: 'turn-1',
+            message: 'target'
+        }]));
+        expect(session.queue.queue.map((item) => [item.message, item.localId])).toEqual([
+            ['before', 'before-id'],
+            ['after', 'after-id']
+        ]);
+
+        harness.suppressTurnCompletion = false;
+        harness.dispatchNotification?.('turn/completed', { status: 'Completed', turn: { id: 'turn-1' } });
+        await vi.waitFor(() => expect(harness.startTurnMessages).toEqual(['first message', 'before\nafter']));
+        session.queue.close();
+        await expect(launcher).resolves.toBe('exit');
+        expect(harness.steerTurnCalls).toHaveLength(1);
     });
 
     it('falls back to queue when explicit native steer fails', async () => {

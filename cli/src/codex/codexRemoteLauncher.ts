@@ -1912,8 +1912,11 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
             waiter();
         };
 
-        const waitForTurnOrRecovery = (signal: AbortSignal): Promise<void> => new Promise((resolve) => {
-            if (!turnInFlight && !recoveryInFlight) {
+        const waitForTurnOrRecovery = (
+            signal: AbortSignal,
+            shouldWake?: () => boolean
+        ): Promise<void> => new Promise((resolve) => {
+            if ((!turnInFlight && !recoveryInFlight) || shouldWake?.()) {
                 resolve();
                 return;
             }
@@ -1928,6 +1931,11 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
 
             loopWakeWaiter = finish;
             signal.addEventListener('abort', finish, { once: true });
+            // Close the check/register race: a steer item may have been moved
+            // to the queue head immediately before loopWakeWaiter was stored.
+            if (shouldWake?.()) {
+                finish();
+            }
         });
 
         const clearCompactRecovery = (recovery: typeof compactRecovery) => {
@@ -3721,6 +3729,13 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
         // may enter the active turn; ordinary queue delivery remains pending
         // until the current turn completes.
         session.queue.setOnMessage(() => wakeLoop());
+        const canConsumeQueueHeadDuringActiveTurn = (): boolean => {
+            const head = session.queue.peek();
+            if (!head) return false;
+            if (head.mode.deliveryMode === 'steer') return true;
+            if (parseGoalCommand(head.message) !== null) return true;
+            return parseCodexSpecialCommand(head.message).type !== null;
+        };
         while (!this.shouldExit) {
             logActiveHandles('loop-top');
             if (!pending && recoveryInFlight) {
@@ -3738,6 +3753,15 @@ class CodexRemoteLauncher extends RemoteLauncherBase {
                     logger.debug('[codex]: Internal wait aborted while turn was active; continuing');
                     continue;
                 }
+                continue;
+            }
+
+
+            if (!pending && turnInFlight && !canConsumeQueueHeadDuringActiveTurn()) {
+                await waitForTurnOrRecovery(
+                    this.abortController.signal,
+                    canConsumeQueueHeadDuringActiveTurn
+                );
                 continue;
             }
 

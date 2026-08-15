@@ -341,6 +341,11 @@ export class MessageQueue2<T> {
         return this.queue.length;
     }
 
+    /** Inspect the next item without consuming it. */
+    peek(): QueueItem<T> | null {
+        return this.queue[0] ?? null;
+    }
+
     /**
      * Wait for messages and return all messages with the same mode as a single string
      * Returns { message: string, mode: T } or null if aborted/closed
