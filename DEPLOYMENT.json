@@ -1,13 +1,13 @@
 {
-  "version": "0.27.2+11",
-  "displayVersion": "0.27.2.11",
-  "commit": "20ee28d3378418794dc7b8f5cc0c2a9d57f67764",
+  "version": "0.27.2+12",
+  "displayVersion": "0.27.2.12",
+  "commit": "d53429818c8b851ad3872be75787ecf0927eb77c",
   "schemaVersion": 25,
-  "deployedAt": "2026-08-19T08:07:20+08:00",
+  "deployedAt": "2026-08-19T12:26:07+08:00",
   "webCommit": "20ee28d3378418794dc7b8f5cc0c2a9d57f67764",
   "webDeployedAt": "2026-08-19T08:07:20+08:00",
-  "deployId": "0.27.2+11-20ee28d3-20260819-080720",
+  "deployId": "0.27.2+12-d5342981-20260819-122607",
   "webDeployId": "0.27.2+11-20ee28d3-20260819-080720-web",
-  "rollbackDeployId": "0.27.2+10-da60cffa-20260815-205019",
-  "rollbackPath": "/home/ubuntu/hapi-custom/backups/0.27.2+11-20ee28d3-20260819-080720"
+  "rollbackDeployId": "0.27.2+11-20ee28d3-20260819-080720",
+  "rollbackPath": "/home/ubuntu/hapi-custom/backups/0.27.2+12-d5342981-20260819-122607"
 }
