@@ -60,6 +60,56 @@ function createHarness(childCount: number = 1, childPath: string = '/tmp/project
 }
 
 describe('manager-linked agent sessions', () => {
+    it('does not report expected archive/delete lifecycle control as failed', async () => {
+        const { engine, children: [child] } = createHarness()
+        const messages: string[] = []
+        engine.sendMessage = async (_sessionId, payload) => { messages.push(payload.text) }
+        const gateway = (engine as unknown as { rpcGateway: { killSession: (sessionId: string) => Promise<void> } }).rpcGateway
+        gateway.killSession = async () => {}
+
+        await engine.archiveSession(child!.id)
+        await engine.deleteSession(child!.id)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        expect(messages).toEqual([])
+        expect(engine.getSession(child!.id)).toBeUndefined()
+        engine.stop()
+    })
+
+    it('does not notify for duplicate or concurrent expected stop events', async () => {
+        const { store, engine, children: [child] } = createHarness()
+        const { engine: rival } = createEngine(store)
+        let sends = 0
+        engine.sendMessage = async () => { sends += 1 }
+        rival.sendMessage = async () => { sends += 1 }
+
+        engine.handleSessionEnd({ sid: child!.id, time: Date.now(), reason: 'terminated' })
+        rival.handleSessionEnd({ sid: child!.id, time: Date.now(), reason: 'terminated' })
+        engine.handleSessionEnd({ sid: child!.id, time: Date.now(), reason: 'handoff' })
+        engine.handleSessionEnd({ sid: child!.id, time: Date.now(), reason: 'cleared' })
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        expect(sends).toBe(0)
+        expect(engine.getSession(child!.id)?.metadata?.managerNotificationState?.terminal).toBeUndefined()
+        engine.stop()
+        rival.stop()
+    })
+
+    it('still reports genuine agent errors as failed', async () => {
+        const { engine, manager, children: [child] } = createHarness()
+        const messages: Array<{ sessionId: string; text: string }> = []
+        engine.sendMessage = async (sessionId, payload) => { messages.push({ sessionId, text: payload.text }) }
+
+        engine.handleSessionEnd({ sid: child!.id, time: Date.now(), reason: 'error' })
+        await waitFor(() => messages.length === 1)
+
+        expect(messages[0]).toEqual({
+            sessionId: manager.id,
+            text: `[HAPI agent notification] Child session "Worker 0" (${child!.id}) failed. Use inspect_peer for details if needed.`
+        })
+        engine.stop()
+    })
+
     it('does not notify a linked manager when either canonical project is missing or different', async () => {
         for (const childPath of ['/tmp/other']) {
             const { engine, children: [child] } = createHarness(1, childPath)

@@ -1045,6 +1045,13 @@ export class SyncEngine {
     }
 
     private async notifyManagerSessionEnd(child: Session, reason?: SessionEndReason): Promise<void> {
+        // Manager terminal notifications describe agent outcomes, not expected
+        // lifecycle control. Archive/delete/restart/clear/handoff paths end a
+        // session intentionally and must not be reported as failures. Keep an
+        // absent reason failure-compatible because older or abruptly disconnected
+        // clients can still end without a structured reason.
+        if (reason === 'terminated' || reason === 'handoff' || reason === 'cleared') return
+
         const linkedManagerSessionId = child.metadata?.managerSessionId
         if (!linkedManagerSessionId || linkedManagerSessionId === child.id) return
         const manager = this.getSessionByNamespace(linkedManagerSessionId, child.namespace)
@@ -1768,7 +1775,7 @@ export class SyncEngine {
                 throw error
             }
         }
-        this.handleSessionEnd({ sid: sessionId, time: Date.now() })
+        this.handleSessionEnd({ sid: sessionId, time: Date.now(), reason: 'terminated' })
     }
 
     async unarchiveSession(sessionId: string): Promise<void> {
