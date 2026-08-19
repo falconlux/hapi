@@ -729,10 +729,11 @@ describe('formatScheduledTime', () => {
 })
 
 describe('QueuedMessagesBar steer action', () => {
-    it('allows Pi thinking and Codex active thinking, but not inactive or user-controlled Codex', () => {
+    it('keeps Pi thinking-gated while Codex remote active does not depend on thinking', () => {
         expect(computeCanSteerQueuedMessages({ flavor: 'pi', active: true, thinking: true, controlledByUser: false })).toBe(true)
+        expect(computeCanSteerQueuedMessages({ flavor: 'pi', active: true, thinking: false, controlledByUser: false })).toBe(false)
         expect(computeCanSteerQueuedMessages({ flavor: 'codex', active: true, thinking: true, controlledByUser: false })).toBe(true)
-        expect(computeCanSteerQueuedMessages({ flavor: 'codex', active: true, thinking: false, controlledByUser: false })).toBe(false)
+        expect(computeCanSteerQueuedMessages({ flavor: 'codex', active: true, thinking: false, controlledByUser: false })).toBe(true)
         expect(computeCanSteerQueuedMessages({ flavor: 'codex', active: false, thinking: true, controlledByUser: false })).toBe(false)
         expect(computeCanSteerQueuedMessages({ flavor: 'codex', active: true, thinking: true, controlledByUser: true })).toBe(false)
     })

@@ -194,8 +194,9 @@ export function computeCanSteerQueuedMessages({
     thinking: boolean
     controlledByUser: boolean
 }): boolean {
-    const supported = flavor === 'pi' || (flavor === 'codex' && active)
-    return supported && thinking && !controlledByUser
+    if (controlledByUser) return false
+    if (flavor === 'pi') return thinking
+    return flavor === 'codex' && active
 }
 
 /**
