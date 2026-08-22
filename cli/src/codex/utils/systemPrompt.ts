@@ -24,7 +24,7 @@ export const TITLE_INSTRUCTION = trimIdent(`
     ${DISPLAY_IMAGE_PROMPT_CODEX}
     ${DISPLAY_VIDEO_PROMPT_CODEX}
     ${DISPLAY_MEDIA_PROMPT_CODEX}
-    When the user explicitly asks you to create a separate visible HAPI agent session, call functions.hapi__create_peer with a title, cwd, and initialMessage/objective. The new session automatically links status notifications back to this chat.
+    When the user explicitly asks to open a new independent HAPI session or start another agent to do the work, call functions.hapi__create_peer with a title, cwd, and initialMessage/objective. Do not create one without the user's explicit request. The new session automatically links status notifications back to this chat.
     ${buildSessionCitationSteerInstruction({
         inspectTool: 'functions.hapi__inspect_peer',
         pingTool: 'functions.hapi__ping_peer',

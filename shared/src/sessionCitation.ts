@@ -26,6 +26,7 @@ export const INSPECT_PEER_TOOL_DESCRIPTION =
 
 /** MCP `ping_peer` tool description (same citation forms as inspect_peer). */
 export const PING_PEER_TOOL_DESCRIPTION =
+    'Use this for hand off / delegate / dispatch / assign / nudge / remind / ask another session requests, including Chinese intent such as 指派、派活、交给、分给、让它、叫它、叫 codex、转告、催一下、问问、接手、盯一下、另开一个会话. Without a citation, first call list_peers to resolve the target. ' +
     'Send a message to another HAPI session (peer handoff / nudge). Resolves by session id prefix, resumes if inactive, then POSTs on the same hub/namespace. ' +
     'When the user cites a peer via [title](/sessions/<id>), Copy-reference prose See session "…" (/sessions/<id>) for context, or a bare /sessions/<id>, ' +
     'extract <id> and pass it as sessionIdPrefix. /sessions/<id> is a hub path - do NOT search the local filesystem for it. ' +
@@ -145,6 +146,7 @@ export function buildSessionCitationSteerInstruction(tools: SessionCitationSteer
         `Call "${tools.inspectTool}" with sessionIdPrefix=<id> to read metadata and recent messages; ` +
         `call "${tools.pingTool}" with sessionIdPrefix=<id> and a message to nudge or hand off. ` +
         `Prefer these over JWT+curl. Shell fallbacks: hapi inspect-peer <id> / hapi ping-peer <id> <message>.`
+        + ` When the user intends to hand off, delegate, dispatch, assign, or give work to another session, asks another session to do something, or wants to ask, nudge, remind, tell, hand over to, or monitor a session — including 指派、派活、交给、分给、让它、叫它、叫 codex、转告、催一下、问问、接手、盯一下、另开一个会话 — use peer tools even without a /sessions/ citation instead of doing that work yourself. First call "${tools.listPeersTool ?? 'list_peers'}" and match by name/cwd/flavor; ping only a unique match. If zero or multiple candidates match, show the candidates and ask the user to choose; never guess. ping_peer is one-way and replies do not flow back; call inspect_peer to see results.`
     if (tools.listPeersTool) {
         text +=
             ` To discover peers without a citation, call "${tools.listPeersTool}" ` +
@@ -153,3 +155,6 @@ export function buildSessionCitationSteerInstruction(tools: SessionCitationSteer
     }
     return text
 }
+
+export const LIST_PEERS_TOOL_DESCRIPTION =
+    'List peer HAPI sessions on the same hub/namespace (id prefix, active, archived, flavor, name). When the user mentions a session without giving an id, call this first to resolve the target by name/cwd/flavor; do not guess. Prefer this over shelling `hapi ping-peer --list`.'

@@ -21,6 +21,7 @@ import {
   INSPECT_PEER_TOOL_DESCRIPTION,
   PING_PEER_TOOL_DESCRIPTION,
   SESSION_ID_PREFIX_PARAM_DESCRIPTION,
+  LIST_PEERS_TOOL_DESCRIPTION,
 } from '@hapi/protocol/sessionCitation';
 import { projectGroupToolDefinitions, PROJECT_GROUP_TOOL_NAMES } from '@/modules/projectGroups/mcpDefinitions';
 import { renamePeerToolDefinition } from '@/modules/renamePeer/mcpDefinition';
@@ -272,7 +273,7 @@ export async function runHappyMcpStdioBridge(argv: string[]): Promise<void> {
       server.registerTool<any, any>(
         'list_peers',
         {
-          description: 'List peer HAPI sessions on the same hub/namespace (id prefix, active, archived, flavor, name). Uses this session\'s hub credentials - works from runner-spawned agents without being on the hub host. Prefer this over shelling `hapi ping-peer --list`. Then call inspect_peer / ping_peer with a listed id.',
+          description: LIST_PEERS_TOOL_DESCRIPTION + ' Then call inspect_peer / ping_peer with a listed id.',
           title: 'List Peer Sessions',
           inputSchema: listPeersInputSchema,
         },
